@@ -22,7 +22,6 @@ dependencies = [
  "fe2o3-amqp",
  "fe2o3-amqp-types",
  "serde",
- "serde_amqp",
  "serde_yaml",
  "tokio",
  "tracing",

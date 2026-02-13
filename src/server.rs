@@ -15,7 +15,7 @@ use tracing::{debug, error, info, warn};
 use crate::cbs::CbsState;
 use crate::config::Topology;
 use crate::router::{self, SharedRouter, Router};
-use crate::sasl;
+use crate::sasl::MockSaslAcceptor;
 
 /// The Azure Service Bus emulator server.
 pub struct Server {
@@ -50,19 +50,11 @@ impl Server {
 }
 
 /// Handles a single TCP connection: SASL handshake, AMQP connection, and sessions.
-async fn handle_connection(mut stream: tokio::net::TcpStream, router: SharedRouter) -> Result<()> {
-    // Check for SASL header and perform mock handshake if needed
-    let mut peek_buf = [0u8; 8];
-    let n = stream.peek(&mut peek_buf).await?;
-    if n >= 8 && sasl::is_sasl_header(&peek_buf) {
-        sasl::perform_handshake(&mut stream).await?;
-        debug!("SASL handshake completed");
-    }
-
-    // Accept AMQP connection
+async fn handle_connection(stream: tokio::net::TcpStream, router: SharedRouter) -> Result<()> {
     let acceptor = ConnectionAcceptor::builder()
         .container_id("azure-servicebus-emulator")
         .max_frame_size(1024 * 1024u32)
+        .sasl_acceptor(MockSaslAcceptor)
         .build();
 
     let mut connection = acceptor.accept(stream).await?;

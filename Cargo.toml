@@ -7,7 +7,6 @@ edition = "2021"
 tokio = { version = "1", features = ["full"] }
 fe2o3-amqp = { version = "0.14", features = ["acceptor"] }
 fe2o3-amqp-types = "0.14"
-serde_amqp = "0.14"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 anyhow = "1.0"
