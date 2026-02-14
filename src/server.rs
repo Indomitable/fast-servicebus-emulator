@@ -9,6 +9,7 @@ use fe2o3_amqp::acceptor::{ConnectionAcceptor, LinkAcceptor, LinkEndpoint, Sessi
 use fe2o3_amqp::session::SessionHandle;
 use fe2o3_amqp::types::performatives::Attach;
 use fe2o3_amqp_types::definitions::{ReceiverSettleMode, Role};
+use std::future::Future;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, info, warn};
@@ -48,20 +49,47 @@ impl Server {
 
     /// Starts listening for AMQP connections on the given address.
     pub async fn run_on(&self, addr: &str) -> Result<()> {
+        self.run_on_with_shutdown(addr, std::future::pending()).await
+    }
+
+    /// Starts listening for AMQP connections with a graceful shutdown signal.
+    pub async fn run_with_shutdown<F>(&self, shutdown: F) -> Result<()>
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.run_on_with_shutdown("0.0.0.0:5672", shutdown).await
+    }
+
+    /// Internal runner with address and shutdown support.
+    async fn run_on_with_shutdown<F>(&self, addr: &str, shutdown: F) -> Result<()>
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
         let listener = TcpListener::bind(addr).await?;
         info!("Listening on {}", addr);
 
-        loop {
-            let (stream, addr) = listener.accept().await?;
-            debug!(peer = %addr, "Connection accepted");
+        tokio::pin!(shutdown);
 
-            let router = self.router.clone();
-            tokio::spawn(async move {
-                if let Err(e) = handle_connection(stream, router).await {
-                    debug!(peer = %addr, error = ?e, "Connection ended");
+        loop {
+            tokio::select! {
+                accept_result = listener.accept() => {
+                    let (stream, addr) = accept_result?;
+                    debug!(peer = %addr, "Connection accepted");
+
+                    let router = self.router.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = handle_connection(stream, router).await {
+                            debug!(peer = %addr, error = ?e, "Connection ended");
+                        }
+                    });
                 }
-            });
+                _ = &mut shutdown => {
+                    info!("Shutdown signal received, stopping listener");
+                    break;
+                }
+            }
         }
+        Ok(())
     }
 }
 

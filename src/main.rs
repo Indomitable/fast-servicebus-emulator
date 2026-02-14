@@ -1,9 +1,10 @@
 use anyhow::Result;
+use fast_servicebus_emulator::config::Config;
 use fast_servicebus_emulator::server::Server;
 use std::env;
+use tokio::signal;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-use fast_servicebus_emulator::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,5 +27,29 @@ async fn main() -> Result<()> {
     );
 
     let server = Server::new(config);
-    server.run().await
+    server.run_with_shutdown(shutdown_signal()).await
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
