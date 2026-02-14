@@ -12,6 +12,7 @@ serde_yaml = "0.9"
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-channel = "2.5.0"
 
 [dev-dependencies]
 fe2o3-amqp = { path = "vendor/fe2o3-amqp/fe2o3-amqp" }

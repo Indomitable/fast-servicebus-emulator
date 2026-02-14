@@ -7,3 +7,6 @@ topics:
     subscriptions:
       - "sub-1"
       - "sub-2"
+  - name: "competing-topic"
+    subscriptions:
+      - "shared-sub"

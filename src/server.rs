@@ -208,7 +208,7 @@ async fn handle_link(
     endpoint: LinkEndpoint,
     router: SharedRouter,
     cbs_state: Arc<CbsState>,
-    pre_subscription: Option<tokio::sync::broadcast::Receiver<router::BroadcastMessage>>,
+    pre_subscription: Option<async_channel::Receiver<router::RouterMessage>>,
 ) -> Result<()> {
     match endpoint {
         LinkEndpoint::Sender(sender) => {

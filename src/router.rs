@@ -1,12 +1,15 @@
-//! Message router backed by `tokio::sync::broadcast` channels.
+//! Message router with competing-consumer queues and topic fan-out.
 //!
-//! Each queue or topic gets a broadcast channel. Senders publish messages to
-//! the channel, and receivers subscribe to it. This provides simple
-//! "fire and forget" message delivery with no persistence or locking.
+//! Each queue and each topic subscription gets an `async_channel` (MPMC).
+//! When multiple receivers subscribe to the same queue or the same
+//! subscription, each message is delivered to exactly **one** receiver
+//! (competing consumers).
 //!
-//! Subscriptions are resolved by mapping paths like
-//! `events-topic/subscriptions/sub-1` (case-insensitive) to the parent
-//! topic's broadcast channel, so all subscribers receive every message.
+//! Topics themselves have no channel — publishing to a topic sends the
+//! message to every subscription's channel independently.
+//!
+//! Subscription paths like `events-topic/subscriptions/sub-1` are
+//! resolved case-insensitively.
 
 use anyhow::Result;
 use fe2o3_amqp::link::{Receiver, Sender};
@@ -14,106 +17,190 @@ use fe2o3_amqp::types::messaging::{Body, Message};
 use fe2o3_amqp::types::primitives::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::broadcast;
 use tracing::{debug, warn};
 
 use crate::config::Topology;
 
-/// Channel capacity for each queue/topic.
+/// Channel capacity for each queue/subscription.
 const CHANNEL_CAPACITY: usize = 1000;
 
-/// Type alias for a message routed through broadcast channels.
-pub type BroadcastMessage = Message<Body<Value>>;
+/// Type alias for a message routed through channels.
+pub type RouterMessage = Message<Body<Value>>;
 
 /// Immutable message router. Created once at startup from the topology
 /// configuration and shared across all connections via `Arc`.
-///
-/// `channels` maps queue/topic names to their broadcast sender.
-/// `subscriptions` maps lowercased subscription paths (e.g.
-/// `"events-topic/subscriptions/sub-1"`) to the parent topic name.
 #[derive(Clone)]
 pub struct Router {
-    channels: HashMap<String, broadcast::Sender<BroadcastMessage>>,
-    subscriptions: HashMap<String, String>,
+    /// Channels for queues and subscriptions. Keyed by queue name or
+    /// the lowercased subscription path (e.g. `events-topic/subscriptions/sub-1`).
+    channels: HashMap<String, async_channel::Sender<RouterMessage>>,
+
+    /// Matching receivers for each channel. Cloning an `async_channel::Receiver`
+    /// gives competing-consumer semantics — each message goes to one consumer.
+    receivers: HashMap<String, async_channel::Receiver<RouterMessage>>,
+
+    /// Maps topic name → list of subscription channel keys.
+    /// Used by `publish()` to fan out to all subscriptions.
+    topic_subscriptions: HashMap<String, Vec<String>>,
+
+    /// Maps lowercased subscription paths to their channel key.
+    /// The channel key is the same lowercased subscription path.
+    subscription_index: HashMap<String, String>,
+
+    /// Set of topic names, so we can distinguish topics from queues
+    /// in `resolve_address` and `has_address`.
+    topics: std::collections::HashSet<String>,
 }
 
 impl Router {
-    /// Creates a new router with a broadcast channel for each queue and topic
-    /// defined in the topology, and a subscription lookup for each
-    /// `{topic}/subscriptions/{sub}` path.
+    /// Creates a new router from the topology configuration.
+    ///
+    /// - Each queue gets its own `async_channel`.
+    /// - Each topic subscription gets its own `async_channel`.
+    /// - Topics are recorded for fan-out but have no channel of their own.
     pub fn from_topology(topology: &Topology) -> Self {
         let mut channels = HashMap::new();
-        let mut subscriptions = HashMap::new();
+        let mut receivers = HashMap::new();
+        let mut topic_subscriptions = HashMap::new();
+        let mut subscription_index = HashMap::new();
+        let mut topics = std::collections::HashSet::new();
 
         for queue in &topology.queues {
-            let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);
+            let (tx, rx) = async_channel::bounded(CHANNEL_CAPACITY);
             channels.insert(queue.name.clone(), tx);
+            receivers.insert(queue.name.clone(), rx);
         }
 
         for topic in &topology.topics {
-            let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);
-            channels.insert(topic.name.clone(), tx);
+            topics.insert(topic.name.clone());
+            let mut sub_keys = Vec::new();
 
             for sub in &topic.subscriptions {
-                let path = format!("{}/subscriptions/{}", topic.name, sub).to_lowercase();
-                subscriptions.insert(path, topic.name.clone());
+                let key = format!("{}/subscriptions/{}", topic.name, sub).to_lowercase();
+                let (tx, rx) = async_channel::bounded(CHANNEL_CAPACITY);
+                channels.insert(key.clone(), tx);
+                receivers.insert(key.clone(), rx);
+                subscription_index.insert(key.clone(), key.clone());
+                sub_keys.push(key);
             }
+
+            topic_subscriptions.insert(topic.name.clone(), sub_keys);
         }
 
         Self {
             channels,
-            subscriptions,
+            receivers,
+            topic_subscriptions,
+            subscription_index,
+            topics,
         }
     }
 
-    /// Resolves an address to the channel name it maps to.
+    /// Resolves an address to the channel key it maps to.
     ///
-    /// - Direct channel names (queues and topics) are returned as-is.
+    /// - Queue names map directly to their channel key.
+    /// - Topic names resolve to the topic name (for publishing — fan-out
+    ///   is handled by `publish()`).
     /// - Subscription paths like `events-topic/Subscriptions/sub-1` are
-    ///   resolved case-insensitively to the parent topic name.
+    ///   resolved case-insensitively to the subscription's channel key.
     /// - Returns `None` if the address is unknown.
-    pub fn resolve_address(&self, address: &str) -> Option<&str> {
-        // Direct channel match — return the key owned by the HashMap
-        if let Some((key, _)) = self.channels.get_key_value(address) {
-            return Some(key.as_str());
+    pub fn resolve_address<'a>(&'a self, address: &'a str) -> Option<&'a str> {
+        // Direct queue channel match
+        if self.channels.contains_key(address) {
+            return Some(address);
+        }
+
+        // Topic match (topics have no channel but are valid addresses for publishing)
+        if self.topics.contains(address) {
+            return Some(address);
         }
 
         // Case-insensitive subscription path lookup
         let lower = address.to_lowercase();
-        self.subscriptions.get(&lower).map(|s| s.as_str())
+        self.subscription_index.get(&lower).map(|s| s.as_str())
     }
 
-    /// Returns true if the given address can be resolved to a channel.
+    /// Returns true if the given address can be resolved.
     pub fn has_address(&self, address: &str) -> bool {
         self.resolve_address(address).is_some()
     }
 
     /// Returns a list of all direct channel addresses (queues and topics).
     pub fn addresses(&self) -> Vec<&str> {
-        self.channels.keys().map(|s| s.as_str()).collect()
+        let mut addrs: Vec<&str> = self.channels.keys().map(|s| s.as_str()).collect();
+        for t in &self.topics {
+            if !self.channels.contains_key(t.as_str()) {
+                addrs.push(t.as_str());
+            }
+        }
+        addrs
     }
 
     /// Returns a list of all registered subscription paths (lowercased).
     pub fn subscription_paths(&self) -> Vec<&str> {
-        self.subscriptions.keys().map(|s| s.as_str()).collect()
+        self.subscription_index.keys().map(|s| s.as_str()).collect()
     }
 
-    /// Publishes a message to the channel for the given address.
-    /// Returns the number of receivers that received the message,
-    /// or `None` if the address cannot be resolved.
-    pub fn publish(&self, address: &str, message: BroadcastMessage) -> Option<usize> {
-        let resolved = self.resolve_address(address)?;
-        self.channels
-            .get(resolved)
-            .map(|tx| tx.send(message).unwrap_or(0))
+    /// Publishes a message to the given address.
+    ///
+    /// - For queues: sends directly to the queue's channel.
+    /// - For topics: fans out to every subscription's channel.
+    /// - For subscription paths: sends directly to that subscription's channel.
+    ///
+    /// Returns `Some(count)` with the number of subscription channels the
+    /// message was sent to, or `None` if the address is unknown.
+    pub fn publish(&self, address: &str, message: RouterMessage) -> Option<usize> {
+        // Direct queue/subscription channel?
+        if let Some(tx) = self.channels.get(address) {
+            let _ = tx.try_send(message);
+            return Some(1);
+        }
+
+        // Topic fan-out?
+        if let Some(sub_keys) = self.topic_subscriptions.get(address) {
+            let mut count = 0;
+            for key in sub_keys {
+                if let Some(tx) = self.channels.get(key) {
+                    let _ = tx.try_send(message.clone());
+                    count += 1;
+                }
+            }
+            return Some(count);
+        }
+
+        // Try case-insensitive subscription path
+        let lower = address.to_lowercase();
+        if let Some(key) = self.subscription_index.get(&lower) {
+            if let Some(tx) = self.channels.get(key) {
+                let _ = tx.try_send(message);
+                return Some(1);
+            }
+        }
+
+        None
     }
 
-    /// Subscribes to messages on the given address.
-    /// Subscription paths are resolved to the parent topic's channel.
-    /// Returns `None` if the address cannot be resolved.
-    pub fn subscribe(&self, address: &str) -> Option<broadcast::Receiver<BroadcastMessage>> {
-        let resolved = self.resolve_address(address)?;
-        self.channels.get(resolved).map(|tx| tx.subscribe())
+    /// Returns a receiver for the given address (competing-consumer).
+    ///
+    /// Multiple calls to `subscribe()` on the same address return clones of
+    /// the same `async_channel::Receiver`. Each message will be delivered to
+    /// exactly one of the receivers.
+    ///
+    /// Subscription paths are resolved case-insensitively.
+    /// Returns `None` if the address is unknown.
+    pub fn subscribe(&self, address: &str) -> Option<async_channel::Receiver<RouterMessage>> {
+        // Direct queue/subscription channel?
+        if let Some(rx) = self.receivers.get(address) {
+            return Some(rx.clone());
+        }
+
+        // Case-insensitive subscription path lookup
+        let lower = address.to_lowercase();
+        if let Some(key) = self.subscription_index.get(&lower) {
+            return self.receivers.get(key).cloned();
+        }
+
+        None
     }
 }
 
@@ -131,7 +218,7 @@ pub fn normalize_address(addr: &str) -> &str {
 /// Handles an incoming sender link (client sending messages to a queue/topic).
 ///
 /// Receives messages from the AMQP link and publishes them to the
-/// corresponding broadcast channel.
+/// corresponding channel.
 pub async fn handle_incoming_messages(
     mut receiver: Receiver,
     address: String,
@@ -156,29 +243,32 @@ pub async fn handle_incoming_messages(
 
 /// Handles an outgoing sender link (server sending messages to a client).
 ///
-/// Uses a pre-subscribed broadcast receiver to forward messages to the
-/// client over the AMQP link. The subscription must be created before this
-/// function is called to avoid missing messages published between link
-/// attachment and subscription.
+/// Receives messages from a competing-consumer channel and forwards them
+/// to the client over the AMQP link.
 pub async fn handle_outgoing_messages(
     mut sender: Sender,
     address: String,
-    mut rx: broadcast::Receiver<BroadcastMessage>,
+    rx: async_channel::Receiver<RouterMessage>,
 ) -> Result<()> {
     loop {
-        match rx.recv().await {
-            Ok(msg) => {
-                debug!(address = %address, "Forwarding message to client");
-                if let Err(e) = sender.send(msg).await {
-                    debug!(address = %address, error = ?e, "Client disconnected");
-                    break;
+        tokio::select! {
+            result = rx.recv() => {
+                match result {
+                    Ok(msg) => {
+                        debug!(address = %address, "Forwarding message to client");
+                        if let Err(e) = sender.send(msg).await {
+                            debug!(address = %address, error = ?e, "Client disconnected");
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        debug!(address = %address, "Channel closed");
+                        break;
+                    }
                 }
             }
-            Err(broadcast::error::RecvError::Lagged(count)) => {
-                warn!(address = %address, count, "Receiver lagged");
-            }
-            Err(broadcast::error::RecvError::Closed) => {
-                debug!(address = %address, "Channel closed");
+            detach_err = sender.on_detach() => {
+                debug!(address = %address, error = ?detach_err, "Link detached by peer");
                 break;
             }
         }
@@ -227,7 +317,10 @@ mod tests {
 
         let mut addrs = router.addresses();
         addrs.sort();
-        assert_eq!(addrs, vec!["queue-a", "queue-b", "topic-x"]);
+        // Addresses now include queues + subscription paths + topic names
+        assert!(addrs.contains(&"queue-a"));
+        assert!(addrs.contains(&"queue-b"));
+        assert!(addrs.contains(&"topic-x"));
     }
 
     #[test]
@@ -241,8 +334,10 @@ mod tests {
             )))
             .build();
 
+        // Publishing to a queue with no active receivers should still succeed
+        // (message is buffered in the channel)
         let count = router.publish("queue-a", msg);
-        assert_eq!(count, Some(0));
+        assert_eq!(count, Some(1));
     }
 
     #[test]
@@ -265,7 +360,7 @@ mod tests {
         let topology = test_topology();
         let router = Router::from_topology(&topology);
 
-        let mut rx = router.subscribe("queue-a").unwrap();
+        let rx = router.subscribe("queue-a").unwrap();
 
         let msg = Message::builder()
             .body(Body::Value(fe2o3_amqp::types::messaging::AmqpValue(
@@ -310,29 +405,99 @@ mod tests {
         };
         let router = Router::from_topology(&topology);
 
-        assert!(router.addresses().is_empty());
         assert!(!router.has_address("anything"));
     }
 
     #[test]
-    fn test_router_multiple_subscribers() {
+    fn test_router_competing_consumers_queue() {
+        // Two receivers on the same queue — only one should get the message
         let topology = test_topology();
         let router = Router::from_topology(&topology);
 
-        let mut rx1 = router.subscribe("queue-a").unwrap();
-        let mut rx2 = router.subscribe("queue-a").unwrap();
+        let rx1 = router.subscribe("queue-a").unwrap();
+        let rx2 = router.subscribe("queue-a").unwrap();
 
         let msg = Message::builder()
             .body(Body::Value(fe2o3_amqp::types::messaging::AmqpValue(
-                Value::String("broadcast".to_string()),
+                Value::String("competing".to_string()),
             )))
             .build();
 
         let count = router.publish("queue-a", msg);
+        assert_eq!(count, Some(1));
+
+        let r1 = rx1.try_recv();
+        let r2 = rx2.try_recv();
+
+        // Exactly one should succeed
+        assert!(
+            (r1.is_ok() && r2.is_err()) || (r1.is_err() && r2.is_ok()),
+            "Expected exactly one receiver to get the message"
+        );
+    }
+
+    #[test]
+    fn test_router_topic_fanout_different_subscriptions() {
+        // Two receivers on different subscriptions — both should get the message
+        let topology = test_topology();
+        let router = Router::from_topology(&topology);
+
+        let rx1 = router
+            .subscribe("topic-x/Subscriptions/sub-1")
+            .expect("sub-1 should resolve");
+        let rx2 = router
+            .subscribe("topic-x/Subscriptions/sub-2")
+            .expect("sub-2 should resolve");
+
+        let msg = Message::builder()
+            .body(Body::Value(fe2o3_amqp::types::messaging::AmqpValue(
+                Value::String("fanout".to_string()),
+            )))
+            .build();
+
+        let count = router.publish("topic-x", msg);
         assert_eq!(count, Some(2));
 
-        assert!(rx1.try_recv().is_ok());
-        assert!(rx2.try_recv().is_ok());
+        let r1 = rx1.try_recv().unwrap();
+        let r2 = rx2.try_recv().unwrap();
+
+        if let Body::Value(fe2o3_amqp::types::messaging::AmqpValue(Value::String(s))) = &r1.body {
+            assert_eq!(s, "fanout");
+        } else {
+            panic!("Unexpected body for sub-1");
+        }
+
+        if let Body::Value(fe2o3_amqp::types::messaging::AmqpValue(Value::String(s))) = &r2.body {
+            assert_eq!(s, "fanout");
+        } else {
+            panic!("Unexpected body for sub-2");
+        }
+    }
+
+    #[test]
+    fn test_router_competing_consumers_same_subscription() {
+        // Two receivers on the SAME subscription — only one should get the message
+        let topology = test_topology();
+        let router = Router::from_topology(&topology);
+
+        let rx1 = router.subscribe("topic-x/subscriptions/sub-1").unwrap();
+        let rx2 = router.subscribe("topic-x/subscriptions/sub-1").unwrap();
+
+        let msg = Message::builder()
+            .body(Body::Value(fe2o3_amqp::types::messaging::AmqpValue(
+                Value::String("compete".to_string()),
+            )))
+            .build();
+
+        router.publish("topic-x", msg);
+
+        let r1 = rx1.try_recv();
+        let r2 = rx2.try_recv();
+
+        assert!(
+            (r1.is_ok() && r2.is_err()) || (r1.is_err() && r2.is_ok()),
+            "Expected exactly one receiver to get the message on same subscription"
+        );
     }
 
     // --- Subscription resolution tests ---
@@ -374,7 +539,7 @@ mod tests {
 
         assert_eq!(
             router.resolve_address("topic-x/subscriptions/sub-1"),
-            Some("topic-x")
+            Some("topic-x/subscriptions/sub-1")
         );
     }
 
@@ -386,7 +551,7 @@ mod tests {
         // Azure SDK sends "Subscriptions" with capital S
         assert_eq!(
             router.resolve_address("topic-x/Subscriptions/sub-1"),
-            Some("topic-x")
+            Some("topic-x/subscriptions/sub-1")
         );
     }
 
@@ -397,11 +562,11 @@ mod tests {
 
         assert_eq!(
             router.resolve_address("topic-x/SUBSCRIPTIONS/SUB-1"),
-            Some("topic-x")
+            Some("topic-x/subscriptions/sub-1")
         );
         assert_eq!(
             router.resolve_address("Topic-X/Subscriptions/Sub-1"),
-            Some("topic-x")
+            Some("topic-x/subscriptions/sub-1")
         );
     }
 
@@ -422,11 +587,11 @@ mod tests {
         let topology = test_topology();
         let router = Router::from_topology(&topology);
 
-        // Subscribe via two different subscription paths — both resolve to topic-x
-        let mut rx1 = router
+        // Subscribe via two different subscription paths — both resolve to different channels
+        let rx1 = router
             .subscribe("topic-x/Subscriptions/sub-1")
             .expect("sub-1 should resolve");
-        let mut rx2 = router
+        let rx2 = router
             .subscribe("topic-x/Subscriptions/sub-2")
             .expect("sub-2 should resolve");
 

@@ -87,7 +87,7 @@ topics:
     fn test_load_topology_file() {
         let topology = Topology::load("topology.yaml").unwrap();
         assert_eq!(topology.queues.len(), 2);
-        assert_eq!(topology.topics.len(), 1);
+        assert_eq!(topology.topics.len(), 2);
     }
 
     #[test]
