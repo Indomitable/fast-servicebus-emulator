@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net462;net8.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <OutputPath>..\..\bin\$(Configuration)\$(MSBuildProjectName)\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <Optimize>true</Optimize>
+    <OutputPath>..\..\bin\$(Configuration)\$(MSBuildProjectName)\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Microsoft.Azure.Amqp.csproj" />
+  </ItemGroup>
+
+</Project>

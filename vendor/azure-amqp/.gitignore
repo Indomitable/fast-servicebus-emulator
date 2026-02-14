@@ -1,0 +1,48 @@
+﻿# User-specific files
+*.suo
+*.user
+*.sln.docstates
+.vs/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+docs/api/
+
+# Roslyn cache directories
+*.ide/
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+
+# NuGet Packages
+packages/*
+*.nupkg
+## TODO: If the tool you use requires repositories.config
+## uncomment the next line
+#!packages/repositories.config
+
+# Enable "build/" folder in the NuGet Packages folder since
+# NuGet packages use it for MSBuild targets.
+# This line needs to be after the ignore of the build folder
+# (and the packages folder if the line above has been uncommented)
+!packages/build/
+
+# Windows Store app package directory
+AppPackages/
+
+# dnx
+*project.lock.json
