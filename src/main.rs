@@ -1,14 +1,15 @@
 use anyhow::Result;
 use azure_servicebus_emulator::{config::Topology, server::Server};
 use tracing::info;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(tracing::Level::INFO)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .init();
 
     let topology = Topology::load("topology.yaml")?;
     info!(

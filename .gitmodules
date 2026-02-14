@@ -1,0 +1,4 @@
+[submodule "vendor/fe2o3-amqp"]
+	path = vendor/fe2o3-amqp
+	url = https://github.com/Indomitable/fe2o3-amqp.git
+	branch = patch/pipelined-flow-credit

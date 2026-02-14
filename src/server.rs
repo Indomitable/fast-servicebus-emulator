@@ -4,13 +4,14 @@
 //! CBS authentication, and message routing between clients and queues/topics.
 
 use anyhow::Result;
+use fe2o3_amqp::acceptor::error::AcceptorAttachError;
 use fe2o3_amqp::acceptor::{ConnectionAcceptor, LinkAcceptor, LinkEndpoint, SessionAcceptor};
 use fe2o3_amqp::session::SessionHandle;
 use fe2o3_amqp::types::performatives::Attach;
 use fe2o3_amqp_types::definitions::Role;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::cbs::CbsState;
 use crate::config::Topology;
@@ -32,8 +33,13 @@ impl Server {
 
     /// Starts listening for AMQP connections on `0.0.0.0:5672`.
     pub async fn run(&self) -> Result<()> {
-        let listener = TcpListener::bind("0.0.0.0:5672").await?;
-        info!("Listening on 0.0.0.0:5672");
+        self.run_on("0.0.0.0:5672").await
+    }
+
+    /// Starts listening for AMQP connections on the given address.
+    pub async fn run_on(&self, addr: &str) -> Result<()> {
+        let listener = TcpListener::bind(addr).await?;
+        info!("Listening on {}", addr);
 
         loop {
             let (stream, addr) = listener.accept().await?;
@@ -60,15 +66,24 @@ async fn handle_connection(stream: tokio::net::TcpStream, router: SharedRouter) 
     let mut connection = acceptor.accept(stream).await?;
     debug!("AMQP connection established");
 
-    // Accept sessions
+    // Accept sessions until the connection is closed.
     let session_acceptor = SessionAcceptor::new();
-    while let Ok(mut session) = session_acceptor.accept(&mut connection).await {
-        let router = router.clone();
-        tokio::spawn(async move {
-            if let Err(e) = handle_session(&mut session, router).await {
-                debug!(error = ?e, "Session ended");
+    loop {
+        match session_acceptor.accept(&mut connection).await {
+            Ok(mut session) => {
+                debug!("New session accepted");
+                let router = router.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handle_session(&mut session, router).await {
+                        debug!(error = ?e, "Session ended");
+                    }
+                });
             }
-        });
+            Err(e) => {
+                debug!(error = ?e, "Session accept ended");
+                break;
+            }
+        }
     }
 
     // Graceful close — peer may have already disconnected
@@ -92,29 +107,77 @@ async fn handle_session(
     let cbs_state = Arc::new(CbsState::new());
 
     loop {
+        debug!("Waiting for next incoming attach...");
         let remote_attach = match session.next_incoming_attach().await {
-            Some(attach) => patch_attach_if_needed(attach),
-            None => break,
+            Some(attach) => {
+                debug!(
+                    link_name = %attach.name,
+                    role = ?attach.role,
+                    source = ?attach.source.as_ref().and_then(|s| s.address.as_ref()),
+                    target = ?attach.target,
+                    "Received incoming attach"
+                );
+                patch_attach_if_needed(attach)
+            }
+            None => {
+                debug!("No more incoming attaches (session closing)");
+                break;
+            }
         };
 
+        debug!(link_name = %remote_attach.name, "Calling accept_incoming_attach...");
         match link_acceptor
             .accept_incoming_attach(remote_attach, session)
             .await
         {
             Ok(endpoint) => {
+                debug!("Link accepted successfully");
+                // For outgoing sender links (server → client), subscribe to the
+                // broadcast channel NOW, before spawning, to guarantee we don't
+                // miss messages published between link attachment and task start.
+                let pre_subscription = if let LinkEndpoint::Sender(ref sender) = endpoint {
+                    let addr = sender
+                        .source()
+                        .as_ref()
+                        .and_then(|s| s.address.as_ref())
+                        .map(|a| a.to_string())
+                        .unwrap_or_default();
+                    let normalized = router::normalize_address(&addr);
+                    if normalized != "$cbs" {
+                        router.subscribe(normalized)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
                 let router = router.clone();
                 let cbs_state = cbs_state.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = handle_link(endpoint, router, cbs_state).await {
+                    if let Err(e) = handle_link(endpoint, router, cbs_state, pre_subscription).await {
                         debug!(error = ?e, "Link ended");
                     }
                 });
             }
-            Err(e) => {
-                error!(error = ?e, "Failed to accept link");
+            Err(AcceptorAttachError::IllegalSessionState) => {
+                // Session engine has stopped (peer sent End, connection closed, etc.)
+                // This is a normal condition — break and clean up.
+                debug!("IllegalSessionState during accept_incoming_attach — session engine stopped");
                 break;
             }
+            Err(e) => {
+                // Link-level attach error — the session is still alive,
+                // so continue accepting other links.
+                warn!(error = ?e, "Failed to accept link, continuing session");
+            }
         }
+    }
+
+    // Explicitly end the session. If the session engine already stopped,
+    // this returns an error which we can safely ignore.
+    if let Err(e) = session.end().await {
+        debug!(error = ?e, "Session end (already ended by peer)");
     }
 
     Ok(())
@@ -137,10 +200,15 @@ fn patch_attach_if_needed(mut attach: Attach) -> Attach {
 }
 
 /// Routes a link endpoint to the appropriate handler based on its address.
+///
+/// `pre_subscription` is an optional broadcast receiver that was created
+/// before spawning this task, to avoid a race between subscription and
+/// message publication.
 async fn handle_link(
     endpoint: LinkEndpoint,
     router: SharedRouter,
     cbs_state: Arc<CbsState>,
+    pre_subscription: Option<tokio::sync::broadcast::Receiver<router::BroadcastMessage>>,
 ) -> Result<()> {
     match endpoint {
         LinkEndpoint::Sender(sender) => {
@@ -156,7 +224,14 @@ async fn handle_link(
                 cbs_state.set_reply_sender(sender).await;
                 debug!("CBS reply sender registered");
             } else {
-                router::handle_outgoing_messages(sender, normalized.to_string(), &router).await?;
+                let rx = match pre_subscription {
+                    Some(rx) => rx,
+                    None => {
+                        warn!(address = %normalized, "No pre-subscription for outgoing link");
+                        return Ok(());
+                    }
+                };
+                router::handle_outgoing_messages(sender, normalized.to_string(), rx).await?;
             }
         }
         LinkEndpoint::Receiver(receiver) => {
