@@ -151,7 +151,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
- "tracing",
  "url",
  "wasmtimer",
 ]

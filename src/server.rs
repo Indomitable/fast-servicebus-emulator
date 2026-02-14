@@ -208,7 +208,7 @@ async fn handle_session(
 /// requires `initial-delivery-count` for sender role. We patch it to `Some(0)`.
 fn patch_attach_if_needed(mut attach: Attach) -> Attach {
     if matches!(attach.role, Role::Sender) && attach.initial_delivery_count.is_none() {
-        warn!(
+        debug!(
             link_name = %attach.name,
             "Patching Attach: role=Sender with missing initial-delivery-count (Azure SDK bug)"
         );

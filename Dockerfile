@@ -11,7 +11,7 @@ WORKDIR /build
 # Copy manifests and vendor source first for better layer caching.
 # Changes to src/ won't invalidate the dependency build layer.
 COPY Cargo.toml Cargo.lock ./
-COPY vendor/ vendor/
+COPY vendor/fe2o3-amqp/ vendor/fe2o3-amqp/
 
 # Create a dummy main.rs so `cargo build` compiles dependencies only.
 RUN mkdir src && \
