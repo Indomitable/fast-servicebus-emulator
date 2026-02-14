@@ -10,18 +10,21 @@ use fe2o3_amqp::session::Session;
 use fe2o3_amqp::types::messaging::{AmqpValue, Body, Message};
 use fe2o3_amqp::types::primitives::Value;
 use tokio::time::Duration;
+use azure_servicebus_emulator::config::Config;
 
 #[tokio::test]
 async fn test_topic_fanout() -> Result<()> {
-    let topology = Topology {
-        queues: vec![],
-        topics: vec![TopicConfig {
-            name: "events-topic".to_string(),
-            subscriptions: vec!["sub-1".to_string(), "sub-2".to_string()],
-        }],
+    let config = Config {
+        topology: Topology {
+            queues: vec![],
+            topics: vec![TopicConfig {
+                name: "events-topic".to_string(),
+                subscriptions: vec!["sub-1".to_string(), "sub-2".to_string()],
+            }],
+        }
     };
 
-    let server = Server::new(topology);
+    let server = Server::new(config);
     tokio::spawn(async move {
         if let Err(e) = server.run().await {
             eprintln!("Server error: {:?}", e);

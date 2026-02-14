@@ -34,9 +34,9 @@ FROM scratch
 COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/azure-servicebus-emulator /emulator
 
 # Ship the default topology so the image works out of the box.
-COPY topology.yaml /config/topology.yaml
+COPY config.yaml /config/config.yaml
 
-ENV TOPOLOGY_PATH=/config/topology.yaml
+ENV CONFIG_PATH=/config/config.yaml
 
 EXPOSE 5672
 

@@ -11,15 +11,16 @@ use fe2o3_amqp::types::messaging::{AmqpValue, Body, Message};
 use fe2o3_amqp::types::primitives::Value;
 use tokio::net::TcpListener;
 use tokio::time::Duration;
+use azure_servicebus_emulator::config::Config;
 
 /// Starts a server on a random free port and returns the port number.
-async fn start_server(topology: Topology) -> u16 {
+async fn start_server(config: Config) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     drop(listener);
 
     let addr = format!("127.0.0.1:{port}");
-    let server = Server::new(topology);
+    let server = Server::new(config);
     tokio::spawn(async move {
         if let Err(e) = server.run_on(&addr).await {
             eprintln!("Server error: {:?}", e);
@@ -36,17 +37,19 @@ async fn start_server(topology: Topology) -> u16 {
 /// connection/session/link lifecycles without accumulating bad state.
 #[tokio::test]
 async fn test_sequential_connections() -> Result<()> {
-    let topology = Topology {
-        queues: vec![QueueConfig {
-            name: "stress-queue".to_string(),
-        }],
-        topics: vec![TopicConfig {
-            name: "stress-topic".to_string(),
-            subscriptions: vec!["sub-a".to_string(), "sub-b".to_string()],
-        }],
+    let config = Config {
+        topology: Topology {
+            queues: vec![QueueConfig {
+                name: "stress-queue".to_string(),
+            }],
+            topics: vec![TopicConfig {
+                name: "stress-topic".to_string(),
+                subscriptions: vec!["sub-a".to_string(), "sub-b".to_string()],
+            }],
+        }
     };
 
-    let port = start_server(topology).await;
+    let port = start_server(config).await;
 
     // 10 sequential rounds of connect -> send -> receive -> close
     for round in 0..10 {
@@ -65,19 +68,21 @@ async fn test_sequential_connections() -> Result<()> {
 /// separate queues. Verifies one connection closing doesn't break the other.
 #[tokio::test]
 async fn test_concurrent_independent_connections() -> Result<()> {
-    let topology = Topology {
-        queues: vec![
-            QueueConfig {
-                name: "conc-queue-a".to_string(),
-            },
-            QueueConfig {
-                name: "conc-queue-b".to_string(),
-            },
-        ],
-        topics: vec![],
+    let config = Config {
+        topology: Topology {
+            queues: vec![
+                QueueConfig {
+                    name: "conc-queue-a".to_string(),
+                },
+                QueueConfig {
+                    name: "conc-queue-b".to_string(),
+                },
+            ],
+            topics: vec![],
+        }
     };
 
-    let port = start_server(topology).await;
+    let port = start_server(config).await;
 
     for round in 0..5 {
         let (r1, r2) = tokio::join!(

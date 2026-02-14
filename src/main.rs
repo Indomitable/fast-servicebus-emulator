@@ -1,8 +1,9 @@
 use anyhow::Result;
-use azure_servicebus_emulator::{config::Topology, server::Server};
+use azure_servicebus_emulator::server::Server;
 use std::env;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use azure_servicebus_emulator::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -13,16 +14,16 @@ async fn main() -> Result<()> {
         .init();
 
     let topology_path =
-        env::var("TOPOLOGY_PATH").unwrap_or_else(|_| "topology.yaml".to_string());
+        env::var("CONFIG_PATH").unwrap_or_else(|_| "config.yaml".to_string());
 
-    let topology = Topology::load(&topology_path)?;
+    let config = Config::load(&topology_path)?;
     info!(
         path = %topology_path,
-        queues = topology.queues.len(),
-        topics = topology.topics.len(),
+        queues = config.topology.queues.len(),
+        topics = config.topology.topics.len(),
         "Topology loaded"
     );
 
-    let server = Server::new(topology);
+    let server = Server::new(config);
     server.run().await
 }

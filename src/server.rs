@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 use tracing::{debug, info, warn};
 
 use crate::cbs::CbsState;
-use crate::config::Topology;
+use crate::config::Config;
 use crate::router::{self, SharedRouter, Router};
 use crate::sasl::MockSaslAcceptor;
 
@@ -25,9 +25,9 @@ pub struct Server {
 
 impl Server {
     /// Creates a new server from the given topology configuration.
-    pub fn new(topology: Topology) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
-            router: Arc::new(Router::from_topology(&topology)),
+            router: Arc::new(Router::from_topology(&config.topology)),
         }
     }
 

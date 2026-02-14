@@ -7,15 +7,18 @@ use fe2o3_amqp::types::messaging::{Body, AmqpValue, Message};
 use fe2o3_amqp::types::primitives::Value;
 use tokio::time::Duration;
 use anyhow::Result;
+use azure_servicebus_emulator::config::Config;
 
 #[tokio::test]
 async fn test_queue_send_receive() -> Result<()> {
-    let topology = Topology {
-        queues: vec![QueueConfig { name: "input-queue".to_string() }],
-        topics: vec![],
+    let config = Config {
+        topology: Topology {
+            queues: vec![QueueConfig { name: "input-queue".to_string() }],
+            topics: vec![],
+        }
     };
 
-    let server = Server::new(topology);
+    let server = Server::new(config);
     tokio::spawn(async move {
         if let Err(e) = server.run().await {
             eprintln!("Server error: {:?}", e);
