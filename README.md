@@ -5,19 +5,23 @@ It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior req
 
 ## Features
 - **Protocol**: AMQP 1.0 over Plain TCP (Port 5672).
-- **Topology**: Static configuration via `topology.yaml`.
+- **Configuration**: Static configuration via `config.yaml`.
 - **Authentication**: Mocks CBS handshake (accepts any token).
 - **Message Delivery**: Simple "Fire and Forget" (ReceiveAndDelete) model using broadcast channels. No locking, no persistence.
 
 ## Configuration
-Edit `topology.yaml` to define queues and topics:
+Edit `config.yaml` to define queues, topics and other configurations:
 ```yaml
-queues:
-  - name: "input-queue"
-  - name: "processing-queue"
-
-topics:
-  - name: "events-topic"
+topology:
+    queues:
+      - name: "input-queue"
+      - name: "processing-queue"
+    
+    topics:
+      - name: "events-topic"
+        subscriptions:
+          - "sub-1"
+          - "sub-2"
 ```
 
 ## Usage

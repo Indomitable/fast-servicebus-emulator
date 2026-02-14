@@ -1,6 +1,6 @@
 use anyhow::Result;
 use azure_servicebus_emulator::{
-    config::{Topology, TopicConfig},
+    config::{Topology, TopicConfig, SubscriptionEntry},
     server::Server,
 };
 use fe2o3_amqp::connection::Connection;
@@ -19,7 +19,10 @@ async fn test_topic_fanout() -> Result<()> {
             queues: vec![],
             topics: vec![TopicConfig {
                 name: "events-topic".to_string(),
-                subscriptions: vec!["sub-1".to_string(), "sub-2".to_string()],
+                subscriptions: vec![
+                    SubscriptionEntry::Name("sub-1".to_string()),
+                    SubscriptionEntry::Name("sub-2".to_string()),
+                ],
             }],
         }
     };

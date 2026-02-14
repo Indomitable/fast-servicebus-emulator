@@ -3,7 +3,24 @@ topology:
     - name: "input-queue"
     - name: "processing-queue"
     - name: "prefetch-queue"
-  
+    # PeekLock tests
+    - name: "peeklock-complete-queue"
+    - name: "peeklock-abandon-queue"
+    - name: "peeklock-deliverycount-queue"
+    - name: "peeklock-brokerprops-queue"
+    # Dead-letter tests
+    - name: "dlq-explicit-queue"
+    - name: "dlq-auto-queue"
+      max_delivery_count: 2
+    # TTL tests
+    - name: "ttl-discard-queue"
+    - name: "ttl-dlq-queue"
+      default_message_ttl_secs: 2
+      dead_lettering_on_message_expiration: true
+    # Backpressure tests
+    - name: "backpressure-queue"
+      max_size: 10
+
   topics:
     - name: "events-topic"
       subscriptions:
@@ -12,3 +29,19 @@ topology:
     - name: "competing-topic"
       subscriptions:
         - "shared-sub"
+    # Correlation filter tests
+    - name: "filter-topic"
+      subscriptions:
+        - name: "orders-sub"
+          filter:
+            type: correlation
+            subject: "order-created"
+        - "all-sub"
+    - name: "filter-appprop-topic"
+      subscriptions:
+        - name: "region-sub"
+          filter:
+            type: correlation
+            properties:
+              region: "us-east"
+        - "catch-all-sub"

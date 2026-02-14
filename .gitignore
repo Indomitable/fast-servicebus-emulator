@@ -3,3 +3,5 @@ bin/
 obj/
 .idea/
 *.user
+vendor/azure-sdk-for-net/
+vendor/azure-sdk-for-net

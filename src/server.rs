@@ -8,7 +8,7 @@ use fe2o3_amqp::acceptor::error::AcceptorAttachError;
 use fe2o3_amqp::acceptor::{ConnectionAcceptor, LinkAcceptor, LinkEndpoint, SessionAcceptor};
 use fe2o3_amqp::session::SessionHandle;
 use fe2o3_amqp::types::performatives::Attach;
-use fe2o3_amqp_types::definitions::Role;
+use fe2o3_amqp_types::definitions::{ReceiverSettleMode, Role};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, info, warn};
@@ -17,6 +17,16 @@ use crate::cbs::CbsState;
 use crate::config::Config;
 use crate::router::{self, SharedRouter, Router};
 use crate::sasl::MockSaslAcceptor;
+use crate::store::{DlqStore, MessageStore};
+
+/// Pre-resolved store for outgoing sender links.
+/// Resolved before spawning the link handler task to avoid race conditions.
+enum PreStore {
+    /// Regular message store (queue or subscription).
+    Regular(Arc<MessageStore>),
+    /// Dead-letter queue store.
+    Dlq(Arc<DlqStore>),
+}
 
 /// The Azure Service Bus emulator server.
 pub struct Server {
@@ -126,16 +136,22 @@ async fn handle_session(
         };
 
         debug!(link_name = %remote_attach.name, "Calling accept_incoming_attach...");
+
+        // Capture the receiver settle mode from the remote attach BEFORE
+        // accept_incoming_attach consumes it. For sender links (our side sends
+        // to the client), this tells us whether the client wants PeekLock
+        // (Second) or ReceiveAndDelete (First).
+        let rcv_settle_mode = remote_attach.rcv_settle_mode.clone();
+
         match link_acceptor
             .accept_incoming_attach(remote_attach, session)
             .await
         {
             Ok(endpoint) => {
                 debug!("Link accepted successfully");
-                // For outgoing sender links (server → client), subscribe to the
-                // broadcast channel NOW, before spawning, to guarantee we don't
-                // miss messages published between link attachment and task start.
-                let pre_subscription = if let LinkEndpoint::Sender(ref sender) = endpoint {
+                // For outgoing sender links (server → client), get the store
+                // NOW, before spawning, to guarantee we don't miss messages.
+                let pre_store = if let LinkEndpoint::Sender(ref sender) = endpoint {
                     let addr = sender
                         .source()
                         .as_ref()
@@ -143,10 +159,12 @@ async fn handle_session(
                         .map(|a| a.to_string())
                         .unwrap_or_default();
                     let normalized = router::normalize_address(&addr);
-                    if normalized != "$cbs" {
-                        router.subscribe(normalized)
-                    } else {
+                    if normalized == "$cbs" {
                         None
+                    } else if router.is_dlq_address(normalized) {
+                        router.get_dlq_store(normalized).map(PreStore::Dlq)
+                    } else {
+                        router.get_store(normalized).map(PreStore::Regular)
                     }
                 } else {
                     None
@@ -155,7 +173,7 @@ async fn handle_session(
                 let router = router.clone();
                 let cbs_state = cbs_state.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = handle_link(endpoint, router, cbs_state, pre_subscription).await {
+                    if let Err(e) = handle_link(endpoint, router, cbs_state, pre_store, rcv_settle_mode).await {
                         debug!(error = ?e, "Link ended");
                     }
                 });
@@ -201,14 +219,17 @@ fn patch_attach_if_needed(mut attach: Attach) -> Attach {
 
 /// Routes a link endpoint to the appropriate handler based on its address.
 ///
-/// `pre_subscription` is an optional broadcast receiver that was created
-/// before spawning this task, to avoid a race between subscription and
-/// message publication.
+/// `pre_store` is an optional pre-resolved store that was looked up before spawning
+/// this task, to avoid a race between store lookup and message publication.
+///
+/// `rcv_settle_mode` is the receiver settle mode from the remote Attach frame.
+/// For sender links (our side), `ReceiverSettleMode::Second` means PeekLock.
 async fn handle_link(
     endpoint: LinkEndpoint,
     router: SharedRouter,
     cbs_state: Arc<CbsState>,
-    pre_subscription: Option<async_channel::Receiver<router::RouterMessage>>,
+    pre_store: Option<PreStore>,
+    rcv_settle_mode: ReceiverSettleMode,
 ) -> Result<()> {
     match endpoint {
         LinkEndpoint::Sender(sender) => {
@@ -224,14 +245,52 @@ async fn handle_link(
                 cbs_state.set_reply_sender(sender).await;
                 debug!("CBS reply sender registered");
             } else {
-                let rx = match pre_subscription {
-                    Some(rx) => rx,
+                let store = match pre_store {
+                    Some(store) => store,
                     None => {
-                        warn!(address = %normalized, "No pre-subscription for outgoing link");
+                        warn!(address = %normalized, "No pre-store for outgoing link");
                         return Ok(());
                     }
                 };
-                router::handle_outgoing_messages(sender, normalized.to_string(), rx).await?;
+                let is_peek_lock = rcv_settle_mode == ReceiverSettleMode::Second;
+                debug!(
+                    address = %normalized,
+                    peek_lock = is_peek_lock,
+                    dlq = matches!(store, PreStore::Dlq(_)),
+                    "Starting outgoing message handler"
+                );
+                match store {
+                    PreStore::Regular(store) => {
+                        if is_peek_lock {
+                            router::handle_outgoing_messages_peek_lock(
+                                sender,
+                                normalized.to_string(),
+                                store,
+                            )
+                            .await?;
+                        } else {
+                            router::handle_outgoing_messages(sender, normalized.to_string(), store)
+                                .await?;
+                        }
+                    }
+                    PreStore::Dlq(store) => {
+                        if is_peek_lock {
+                            router::handle_outgoing_dlq_messages_peek_lock(
+                                sender,
+                                normalized.to_string(),
+                                store,
+                            )
+                            .await?;
+                        } else {
+                            router::handle_outgoing_dlq_messages(
+                                sender,
+                                normalized.to_string(),
+                                store,
+                            )
+                            .await?;
+                        }
+                    }
+                }
             }
         }
         LinkEndpoint::Receiver(receiver) => {

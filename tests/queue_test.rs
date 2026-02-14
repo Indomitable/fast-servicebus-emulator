@@ -13,7 +13,7 @@ use azure_servicebus_emulator::config::Config;
 async fn test_queue_send_receive() -> Result<()> {
     let config = Config {
         topology: Topology {
-            queues: vec![QueueConfig { name: "input-queue".to_string() }],
+            queues: vec![QueueConfig::new("input-queue")],
             topics: vec![],
         }
     };

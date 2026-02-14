@@ -1,6 +1,6 @@
 use anyhow::Result;
 use azure_servicebus_emulator::{
-    config::{QueueConfig, TopicConfig, Topology},
+    config::{QueueConfig, TopicConfig, Topology, SubscriptionEntry},
     server::Server,
 };
 use fe2o3_amqp::connection::Connection;
@@ -39,12 +39,13 @@ async fn start_server(config: Config) -> u16 {
 async fn test_sequential_connections() -> Result<()> {
     let config = Config {
         topology: Topology {
-            queues: vec![QueueConfig {
-                name: "stress-queue".to_string(),
-            }],
+            queues: vec![QueueConfig::new("stress-queue")],
             topics: vec![TopicConfig {
                 name: "stress-topic".to_string(),
-                subscriptions: vec!["sub-a".to_string(), "sub-b".to_string()],
+                subscriptions: vec![
+                    SubscriptionEntry::Name("sub-a".to_string()),
+                    SubscriptionEntry::Name("sub-b".to_string()),
+                ],
             }],
         }
     };
@@ -71,12 +72,8 @@ async fn test_concurrent_independent_connections() -> Result<()> {
     let config = Config {
         topology: Topology {
             queues: vec![
-                QueueConfig {
-                    name: "conc-queue-a".to_string(),
-                },
-                QueueConfig {
-                    name: "conc-queue-b".to_string(),
-                },
+                QueueConfig::new("conc-queue-a"),
+                QueueConfig::new("conc-queue-b"),
             ],
             topics: vec![],
         }
