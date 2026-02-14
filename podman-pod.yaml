@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fast-servicebus-emulator-pod
+spec:
+  containers:
+    - name: emulator
+      image: docker.io/indomitable/fast-servicebus-emulator:latest
+      ports:
+        - containerPort: 5672
+          hostPort: 5672
+      env:
+        - name: RUST_LOG
+          value: "info"
+        - name: CONFIG_PATH
+          value: /config/config.yaml
+      volumeMounts:
+        - name: config-volume
+          mountPath: /config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: fast-servicebus-config
+        items:
+          - key: config.yaml
+            path: config.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fast-servicebus-config
+data:
+  config.yaml: |-
+    topology:
+      queues:
+        - name: "queue"
+    
+      topics:
+        - name: "events"
+          subscriptions:
+            - name: sub-1
+              filter:
+                type: correlation
+                properties:
+                  region: "us-east"
+            - name: sub-2
+              filter:
+                type: correlation
+                subject: "order-created"
+            - name: sub-3

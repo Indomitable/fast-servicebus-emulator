@@ -1,0 +1,10 @@
+services:
+  fast-servicebus-emulator:
+    image: docker.io/indomitable/fast-servicebus-emulator:latest
+    ports:
+      - "5672:5672"
+    environment:
+      RUST_LOG: info
+      CONFIG_PATH: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro,Z

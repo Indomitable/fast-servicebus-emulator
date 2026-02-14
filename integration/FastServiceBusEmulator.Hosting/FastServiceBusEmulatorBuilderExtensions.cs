@@ -8,7 +8,7 @@ namespace FastServiceBusEmulator.Hosting;
 /// </summary>
 public static class FastServiceBusEmulatorBuilderExtensions
 {
-    private const string DefaultContainerImage = "localhost/fast-servicebus-emulator";
+    private const string DefaultContainerImage = "indomitable/fast-servicebus-emulator";
     private const string DefaultContainerTag = "latest";
 
     /// <summary>

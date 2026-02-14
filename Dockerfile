@@ -34,7 +34,7 @@ FROM scratch
 COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/fast-servicebus-emulator /emulator
 
 # Ship the default topology so the image works out of the box.
-COPY config.yaml /config/config.yaml
+COPY config-sample.yaml /config/config.yaml
 
 ENV CONFIG_PATH=/config/config.yaml
 

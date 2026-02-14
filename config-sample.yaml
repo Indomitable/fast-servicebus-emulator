@@ -1,0 +1,17 @@
+topology:
+  queues:
+    - name: "queue"
+
+  topics:
+    - name: "events"
+      subscriptions:
+        - name: sub-1
+          filter:
+            type: correlation
+            properties:
+              region: "us-east"
+        - name: sub-2
+          filter:
+            type: correlation
+            subject: "order-created"
+        - name: sub-3

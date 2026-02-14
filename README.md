@@ -40,3 +40,22 @@ Run tests:
 ```bash
 cargo test
 ```
+
+# Docker Image
+Run either using:
+```bash
+podman kube play podman-pod.yaml
+```
+and kill with 
+```bash
+podman kube down podman-pod.yaml
+```
+
+or using compose
+```bash
+podman compose up fast-servicebus-emulator 
+```
+and kill with
+```bash
+podman compose down fast-servicebus-emulator
+```
