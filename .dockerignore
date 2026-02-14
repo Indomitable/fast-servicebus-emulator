@@ -1,0 +1,9 @@
+target/
+integration/
+tests/
+.git/
+.idea/
+.opencode/
+*.md
+.gitignore
+.gitmodules

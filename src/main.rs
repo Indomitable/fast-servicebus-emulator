@@ -1,5 +1,6 @@
 use anyhow::Result;
 use azure_servicebus_emulator::{config::Topology, server::Server};
+use std::env;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -11,8 +12,12 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let topology = Topology::load("topology.yaml")?;
+    let topology_path =
+        env::var("TOPOLOGY_PATH").unwrap_or_else(|_| "topology.yaml".to_string());
+
+    let topology = Topology::load(&topology_path)?;
     info!(
+        path = %topology_path,
         queues = topology.queues.len(),
         topics = topology.topics.len(),
         "Topology loaded"
