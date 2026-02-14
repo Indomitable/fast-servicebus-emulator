@@ -1,5 +1,5 @@
 use anyhow::Result;
-use azure_servicebus_emulator::{
+use fast_servicebus_emulator::{
     config::{QueueConfig, TopicConfig, Topology, SubscriptionEntry},
     server::Server,
 };
@@ -11,7 +11,7 @@ use fe2o3_amqp::types::messaging::{AmqpValue, Body, Message};
 use fe2o3_amqp::types::primitives::Value;
 use tokio::net::TcpListener;
 use tokio::time::Duration;
-use azure_servicebus_emulator::config::Config;
+use fast_servicebus_emulator::config::Config;
 
 /// Starts a server on a random free port and returns the port number.
 async fn start_server(config: Config) -> u16 {

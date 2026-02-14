@@ -26,12 +26,12 @@ RUN mkdir src && \
 COPY src/ src/
 RUN touch src/*.rs && \
     cargo build --release --target x86_64-unknown-linux-musl && \
-    strip /build/target/x86_64-unknown-linux-musl/release/azure-servicebus-emulator
+    strip /build/target/x86_64-unknown-linux-musl/release/fast-servicebus-emulator
 
 # ── Runtime ───────────────────────────────────────────────────────
 FROM scratch
 
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/azure-servicebus-emulator /emulator
+COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/fast-servicebus-emulator /emulator
 
 # Ship the default topology so the image works out of the box.
 COPY config.yaml /config/config.yaml

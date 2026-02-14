@@ -68,7 +68,7 @@ impl Server {
 /// Handles a single TCP connection: SASL handshake, AMQP connection, and sessions.
 async fn handle_connection(stream: tokio::net::TcpStream, router: SharedRouter) -> Result<()> {
     let acceptor = ConnectionAcceptor::builder()
-        .container_id("azure-servicebus-emulator")
+        .container_id("fast-servicebus-emulator")
         .max_frame_size(1024 * 1024u32)
         .sasl_acceptor(MockSaslAcceptor)
         .build();

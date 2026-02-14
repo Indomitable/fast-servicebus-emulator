@@ -1,5 +1,5 @@
 use anyhow::Result;
-use azure_servicebus_emulator::{
+use fast_servicebus_emulator::{
     config::{Topology, TopicConfig, SubscriptionEntry},
     server::Server,
 };
@@ -10,7 +10,7 @@ use fe2o3_amqp::session::Session;
 use fe2o3_amqp::types::messaging::{AmqpValue, Body, Message};
 use fe2o3_amqp::types::primitives::Value;
 use tokio::time::Duration;
-use azure_servicebus_emulator::config::Config;
+use fast_servicebus_emulator::config::Config;
 
 #[tokio::test]
 async fn test_topic_fanout() -> Result<()> {

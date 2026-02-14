@@ -1,4 +1,4 @@
-use azure_servicebus_emulator::{config::Topology, server::Server};
+use fast_servicebus_emulator::{config::Topology, server::Server};
 use fe2o3_amqp::connection::Connection;
 use fe2o3_amqp::sasl_profile::SaslProfile;
 use fe2o3_amqp::session::Session;
@@ -7,7 +7,7 @@ use fe2o3_amqp::types::messaging::{Body, AmqpValue, ApplicationProperties, Messa
 use fe2o3_amqp::types::primitives::Value;
 use tokio::time::Duration;
 use anyhow::Result;
-use azure_servicebus_emulator::config::Config;
+use fast_servicebus_emulator::config::Config;
 
 #[tokio::test]
 async fn test_cbs_handshake() -> Result<()> {

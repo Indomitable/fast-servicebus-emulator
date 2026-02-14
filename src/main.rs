@@ -1,9 +1,9 @@
 use anyhow::Result;
-use azure_servicebus_emulator::server::Server;
+use fast_servicebus_emulator::server::Server;
 use std::env;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-use azure_servicebus_emulator::config::Config;
+use fast_servicebus_emulator::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
