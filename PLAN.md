@@ -23,10 +23,11 @@ src/
   lib.rs       — Module declarations
   config.rs    — YAML topology config (QueueConfig, SubscriptionEntry, SubscriptionFilter)
   router.rs    — Message routing, topic fan-out, competing consumers (uses MessageStore)
-  server.rs    — AMQP connection/session/link lifecycle
+  server.rs    — AMQP server — connection/session/link lifecycle
   store.rs     — MessageStore (PeekLock, settlement, TTL) + DlqStore (dead-letter queues)
   sasl.rs      — Mock SASL acceptor
   cbs.rs       — Mock CBS token handler
+  helpers/     — Utility modules (router_message utilities)
 ```
 
 ## P1 — Critical Features
@@ -36,17 +37,17 @@ Transform the emulator from a simple ReceiveAndDelete pass-through into a produc
 | #  | Feature | Status | Description |
 |----|---------|--------|-------------|
 | 1  | Topology config enhancement | DONE | Extended YAML schema: lockDuration, maxDeliveryCount, defaultMessageTTL, deadLetteringOnExpiration, subscription filter rules |
-| 2  | Message store module | DONE | `MessageStore` with Envelope, SequenceNumber, EnqueuedTimeUtc, DeliveryCount, LockToken, message state machine. `DlqStore` as separate type (no recursive Arc, no unsafe). Integrated with router — replaced `async_channel` with `MessageStore`. |
-| 3  | Broker properties stamping | TODO | Stamp SequenceNumber, EnqueuedTimeUtc, DeliveryCount as AMQP message-annotations on outgoing messages |
-| 4  | PeekLock mode | TODO | Detect `ReceiverSettleMode::Second` on link attach. Use `receive_and_lock()` instead of `receive_and_delete()`. Send locked messages with lock token in delivery-annotations. |
-| 5  | Message settlement | TODO | Handle AMQP disposition frames: Accepted -> complete, Released -> abandon, Rejected/Modified -> dead-letter. Wire up to `MessageStore::complete/abandon/dead_letter`. |
-| 6  | Delivery count tracking + auto-DLQ | TODO | Auto-dead-letter when delivery count exceeds `maxDeliveryCount` (logic exists in store, needs wiring) |
-| 7  | Dead-letter queue | TODO | `$deadletterqueue` sub-entity per queue/subscription. DLQ receiver links (address `<entity>/$deadletterqueue`). |
-| 8  | Message TTL | TODO | Per-message `TimeToLive` + per-entity `DefaultMessageTimeToLive`. Background expiry task to avoid relying on receive-triggered cleanup. |
-| 9  | Subscription filters | TODO | SQL filters and correlation filters evaluated during topic fan-out |
-| 10 | Backpressure | TODO | AMQP link credit flow control when entity is at capacity |
-| 11 | Reject unknown addresses | TODO | Return `amqp:not-found` error instead of silent accept |
-| 12 | Verify no regressions | TODO | Run all Rust + .NET tests after all P1 features are implemented |
+| 2  | Message store module | DONE | `MessageStore` with Envelope, SequenceNumber, EnqueuedTimeUtc, DeliveryCount, LockToken, message state machine. `DlqStore` as separate type. |
+| 3  | Broker properties stamping | DONE | Stamp SequenceNumber, EnqueuedTimeUtc, DeliveryCount as AMQP message-annotations on outgoing messages. Implemented in `helpers/router_message.rs`. |
+| 4  | PeekLock mode | DONE | Support `ReceiverSettleMode::Second`. Handle locked messages with lock tokens. |
+| 5  | Message settlement | DONE | Handle AMQP disposition frames: Accepted, Released, Rejected, Modified. Wired to `MessageStore`. |
+| 6  | Delivery count tracking + auto-DLQ | DONE | Auto-dead-letter when delivery count exceeds `maxDeliveryCount`. |
+| 7  | Dead-letter queue | DONE | `$deadletterqueue` sub-entity per queue/subscription. Supported in router and store. |
+| 8  | Message TTL | PARTIAL | Per-message and per-entity TTL implemented. Missing background expiry task (currently cleaned up on receive). |
+| 9  | Subscription filters | PARTIAL | Correlation filters fully implemented. SQL filters logged and match all (by design). |
+| 10 | Backpressure | DONE | Reject with `amqp:resource-limit-exceeded` when store is at `max_size`. |
+| 11 | Reject unknown addresses | DONE | Return `amqp:not-found` error instead of silent accept. |
+| 12 | Verify no regressions | DONE | All 86 Rust tests and 20 .NET integration tests pass. |
 
 ### Implementation Notes
 
@@ -73,31 +74,31 @@ Transform the emulator from a simple ReceiveAndDelete pass-through into a produc
 
 ## P2 — Enhanced Features
 
-| Feature | Description |
-|---------|-------------|
-| Filter actions | SQL SET/REMOVE on message properties during routing |
-| Batch receive | Multiple messages in single receive call |
-| Lock renewal | AMQP-level lock renewal via management operations |
-| Peek operation | Read without consuming |
-| Scheduled messages | `ScheduledEnqueueTimeUtc` — message becomes visible at scheduled time |
-| Message sessions | `SessionId`, session lock, session state, session-aware receivers |
-| Auto-forwarding | Forward messages from one entity to another |
-| Duplicate detection | `MessageId`-based deduplication within configurable window |
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Filter actions | SQL SET/REMOVE on message properties during routing | TODO |
+| Batch receive | Multiple messages in single receive call | TODO |
+| Lock renewal | AMQP-level lock renewal via management operations | TODO |
+| Peek operation | Read without consuming | TODO |
+| Scheduled messages | `ScheduledEnqueueTimeUtc` — message becomes visible at scheduled time | TODO |
+| Message sessions | `SessionId`, session lock, session state, session-aware receivers | TODO |
+| Auto-forwarding | Forward messages from one entity to another | TODO |
+| Duplicate detection | `MessageId`-based deduplication within configurable window | TODO |
 
 ## P3 — Polish
 
-| Feature | Description |
-|---------|-------------|
-| Integration test expansion | .NET tests for PeekLock, DLQ, settlement, TTL, filters |
-| Fix test port conflicts | Rust integration tests share port 5672 — use dynamic ports |
-| Aspire integration completion | Verify Aspire hosting works end-to-end |
-| Docker image optimization | Review multi-stage build, minimize layers |
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Integration test expansion | .NET tests for PeekLock, DLQ, settlement, TTL, filters | DONE |
+| Fix test port conflicts | Rust integration tests share port 5672 — use dynamic ports | TODO |
+| Aspire integration completion | Verify Aspire hosting works end-to-end | TODO |
+| Docker image optimization | Review multi-stage build, minimize layers | DONE |
 
 ## Test Infrastructure
 
 - **Rust unit tests**: `cargo test --lib` (57 tests)
 - **Rust integration tests**: `cargo test --test <name>` (5 tests: queue, topic, CBS, 2x stress)
-- **.NET integration tests**: 8 tests (EmulatorTests, SingleReceiverTests, LinkCreditTests)
+- **.NET integration tests**: 20 tests in 9 files
 - **Test isolation**: .NET tests share emulator on port 5672, use separate queues/topics per test
 
 ## Key Files
@@ -106,11 +107,12 @@ Transform the emulator from a simple ReceiveAndDelete pass-through into a produc
 |------|---------|
 | `src/store.rs` | MessageStore + DlqStore — PeekLock, settlement, TTL, delivery tracking |
 | `src/router.rs` | Message routing with MessageStore, topic fan-out, address resolution |
+| `src/helpers/router_message.rs` | Stamping and filtering logic |
 | `src/server.rs` | AMQP server — connection/session/link lifecycle |
 | `src/config.rs` | YAML topology config with queue/subscription properties and filters |
 | `src/sasl.rs` | Mock SASL (accepts PLAIN, ANONYMOUS, EXTERNAL, MSSBCBS) |
 | `src/cbs.rs` | Mock CBS token handler |
-| `config.yaml` | Default topology (3 queues, 2 topics) |
+| `config.yaml` | Default topology (12 queues, 4 topics) |
 | `Cargo.toml` | Dependencies: tokio, fe2o3-amqp, serde, uuid |
 
 ## fe2o3-amqp Patches
@@ -120,3 +122,8 @@ Three race conditions fixed in the vendored submodule (branch `patch/pipelined-f
 1. **Session relay not registered for pipelined frames** — `acceptor/connection.rs`
 2. **Flow/Transfer frames crash session for not-yet-accepted links** — `acceptor/session.rs`
 3. **Pipelined Flow credit lost, causing sender links to block forever** — `acceptor/session.rs`
+
+**Emulator-specific fixes in submodule:**
+1. **Manual Header Serialize** (always send `delivery_count`)
+2. **Echo Disposition state is always Accepted**
+3. **Tail chunk handling in on_incoming_disposition**

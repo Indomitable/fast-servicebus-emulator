@@ -30,8 +30,8 @@ TCP (port 5672)
 ## Directory Structure
 
 ```
-src/                    # Emulator Rust source code (8 files)
-tests/                  # Rust integration tests (4 files)
+src/                    # Emulator Rust source code (10 files)
+tests/                  # Rust integration tests (6 files)
 integration/            # .NET xUnit integration tests (9 test files)
 vendor/fe2o3-amqp/      # Git submodule: patched fe2o3-amqp AMQP 1.0 library
 vendor/azure-sdk-for-net/  # Reference: Azure .NET SDK source (read-only)
@@ -43,19 +43,19 @@ PLAN.md                 # Full project plan and requirements
 
 ## Source Files
 
-### `src/main.rs` (31 lines)
+### `src/main.rs` (~30 lines)
 Entry point. Sets up tracing, reads `CONFIG_PATH` env var, loads config, starts server.
 
-### `src/lib.rs` (7 lines)
+### `src/lib.rs` (~7 lines)
 Module declarations.
 
-### `src/config.rs` (394 lines)
+### `src/config.rs` (~390 lines)
 YAML topology configuration parsing. Key types:
 - `Config` / `Topology` / `QueueConfig` / `TopicConfig` / `SubscriptionConfig`
 - `SubscriptionFilter` enum (`Correlation` variant only; `Sql` is parsed but not evaluated)
 - `SubscriptionEntry` (untagged: string name or full config object)
 
-### `src/server.rs` (362 lines)
+### `src/server.rs` (~360 lines)
 AMQP connection handling and link lifecycle. Key functions:
 - `Server::run()` / `Server::run_on()` -- TCP listener on 0.0.0.0:5672
 - `handle_connection()` -- SASL handshake, AMQP connection setup
@@ -63,28 +63,31 @@ AMQP connection handling and link lifecycle. Key functions:
 - `handle_link()` -- routes sender/receiver endpoints to CBS or queue/topic handlers
 - `patch_attach_if_needed()` -- workaround for Azure SDK bug (missing `initial_delivery_count` on sender Attach frames)
 
-### `src/router.rs` (1754 lines)
-Message routing and delivery. The largest source file. Key types and functions:
+### `src/router.rs` (~650 lines)
+Message routing and delivery. Handles link lifecycle for messaging.
 - `Router` -- owns all message stores, DLQ stores, topic-subscription mappings
 - `Router::publish()` -- enqueues to queue or fans out to topic subscriptions
 - `handle_incoming_messages()` -- client-to-server (sender link handler)
 - `handle_outgoing_messages()` -- server-to-client, ReceiveAndDelete mode
 - `handle_outgoing_messages_peek_lock()` -- server-to-client, PeekLock mode with disposition settlement
 - `handle_outgoing_dlq_messages()` / `handle_outgoing_dlq_messages_peek_lock()` -- DLQ variants
-- `stamp_broker_properties()` -- stamps sequence number, enqueued time, lock token, delivery count on outgoing messages
-- `matches_filter()` -- evaluates correlation filters against message properties
 
-### `src/store.rs` (1158 lines)
+### `src/store.rs` (~760 lines)
 In-memory message store. Key types:
 - `MessageStore` -- main queue/subscription store with enqueue, receive, lock, complete, abandon, dead-letter, TTL expiry, backpressure (`logical_count` / `max_size`)
 - `DlqStore` -- dead-letter queue (simpler, no TTL, no nested DLQ)
 - `Envelope` -- wraps a message with metadata (sequence number, delivery count, lock state, TTL)
 - `EntityConfig` -- per-queue/subscription settings (lock duration, max delivery count, TTL, max size)
 
-### `src/sasl.rs` (115 lines)
+### `src/helpers/router_message.rs` (~580 lines)
+Internal message utilities and their unit tests.
+- `stamp_broker_properties()` -- stamps sequence number, enqueued time, lock token, delivery count on outgoing messages
+- `matches_filter()` -- evaluates correlation filters against message properties
+
+### `src/sasl.rs` (~115 lines)
 Mock SASL acceptor. Accepts ANONYMOUS, PLAIN, MSSBCBS, EXTERNAL. Always returns `SaslCode::Ok`.
 
-### `src/cbs.rs` (160 lines)
+### `src/cbs.rs` (~160 lines)
 Mock CBS (Claims-Based Security) handler. Accepts any put-token request, responds with status 200 OK.
 
 ## fe2o3-amqp Submodule (vendor/fe2o3-amqp/)
