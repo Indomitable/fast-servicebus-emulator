@@ -1,28 +1,37 @@
+use std::fmt::{Display, Formatter};
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct QueueConfig {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TopicConfig {
     pub name: String,
     pub subscriptions: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Topology {
     pub queues: Vec<QueueConfig>,
     pub topics: Vec<TopicConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub topology: Topology,
+}
+
+impl Display for Config {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // serialize to yaml using serde
+        let yaml = serde_yaml::to_string(self).unwrap();
+        write!(f, "\n{}", yaml)
+    }
 }
 
 impl Config {

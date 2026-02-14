@@ -19,9 +19,10 @@ async fn main() -> Result<()> {
     let config = Config::load(&topology_path)?;
     info!(
         path = %topology_path,
+        config = %config,
         queues = config.topology.queues.len(),
         topics = config.topology.topics.len(),
-        "Topology loaded"
+        "Topology loaded",
     );
 
     let server = Server::new(config);
