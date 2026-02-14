@@ -1,6 +1,7 @@
 queues:
   - name: "input-queue"
   - name: "processing-queue"
+  - name: "prefetch-queue"
 
 topics:
   - name: "events-topic"
