@@ -54,6 +54,11 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
 
     public FastServiceBusEmulatorResourceBuilder WithTopology(Topology topology)
     {
+        if (topology.Queues.Any(q => string.IsNullOrEmpty(q.Name) || topology.Topics.Any(t =>
+                string.IsNullOrEmpty(t.Name) || t.Subscriptions.Any(s => string.IsNullOrEmpty(s.Name)))))
+        {
+            throw new ArgumentException("Queue, Topic and Subscription names cannot be empty.", nameof(topology));
+        }
         var config = BuildTopology(topology);
         this.WithContainerFiles("/config/", [
             new ContainerFile
@@ -70,8 +75,8 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
     {
         var configBuilder = new StringBuilder();
         configBuilder.AppendLine("topology:");
-        var ident0 = CreateIdent(2);
-        configBuilder.Append($"{ident0}queues:");
+        var indent0 = CreateIndent(2);
+        configBuilder.Append($"{indent0}queues:");
         if (topology.Queues.Count == 0)
         {
             configBuilder.Append(" []");
@@ -79,9 +84,9 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
         configBuilder.AppendLine();
         foreach (var queue in topology.Queues)
         {
-            WriteQueue(queue, configBuilder);
+            WriteEntityConfig(queue, configBuilder);
         }
-        configBuilder.Append($"{ident0}topics:");
+        configBuilder.Append($"{indent0}topics:");
         if (topology.Topics.Count == 0)
         {
             configBuilder.Append(" []");
@@ -89,10 +94,10 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
         configBuilder.AppendLine();
         foreach (var topic in topology.Topics)
         {
-            var ident1 = CreateIdent(4);
-            configBuilder.AppendLine($"{ident1}- name: \"{topic.Name}\"");
-            var ident2 = CreateIdent(6);
-            configBuilder.Append($"{ident2}subscriptions:");
+            var indent1 = CreateIndent(4);
+            configBuilder.AppendLine($"{indent1}- name: \"{EscapeYamlString(topic.Name)}\"");
+            var indent2 = CreateIndent(6);
+            configBuilder.Append($"{indent2}subscriptions:");
             if (topic.Subscriptions.Count == 0)
             {
                 configBuilder.Append(" []");
@@ -106,57 +111,57 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
         return configBuilder.ToString();
     }
 
-    private static void WriteQueue(Queue queue, StringBuilder builder, int ident = 4)
+    private static void WriteEntityConfig(BaseEntityConfig entityConfig, StringBuilder builder, int indent = 4)
     {
-        var ident0 = CreateIdent(ident);
-        var ident1 = CreateIdent(ident + 2);
-        builder.AppendLine($"{ident0}- name: \"{queue.Name}\"");
-        if (queue.LockDurationSeconds.HasValue)
-            builder.AppendLine($"{ident1}lock_duration_secs: {queue.LockDurationSeconds.Value}");
-        if (queue.MaxDeliveryCount.HasValue)
-            builder.AppendLine($"{ident1}max_delivery_count: {queue.MaxDeliveryCount.Value}");
-        if (queue.DefaultMessageTtlSeconds.HasValue)
-            builder.AppendLine($"{ident1}default_message_ttl_secs: {queue.DefaultMessageTtlSeconds.Value}");
-        if (queue.DeadLetteringOnMessageExpiration.HasValue)
-            builder.AppendLine($"{ident1}dead_lettering_on_message_expiration: {queue.DeadLetteringOnMessageExpiration.Value.ToString().ToLowerInvariant()}");
-        if (queue.MaxSize.HasValue)
-            builder.AppendLine($"{ident1}max_size: {queue.MaxSize.Value}");
+        var indent0 = CreateIndent(indent);
+        var indent1 = CreateIndent(indent + 2);
+        builder.AppendLine($"{indent0}- name: \"{EscapeYamlString(entityConfig.Name)}\"");
+        if (entityConfig.LockDurationSeconds.HasValue)
+            builder.AppendLine($"{indent1}lock_duration_secs: {entityConfig.LockDurationSeconds.Value}");
+        if (entityConfig.MaxDeliveryCount.HasValue)
+            builder.AppendLine($"{indent1}max_delivery_count: {entityConfig.MaxDeliveryCount.Value}");
+        if (entityConfig.DefaultMessageTtlSeconds.HasValue)
+            builder.AppendLine($"{indent1}default_message_ttl_secs: {entityConfig.DefaultMessageTtlSeconds.Value}");
+        if (entityConfig.DeadLetteringOnMessageExpiration.HasValue)
+            builder.AppendLine($"{indent1}dead_lettering_on_message_expiration: {entityConfig.DeadLetteringOnMessageExpiration.Value.ToString().ToLowerInvariant()}");
+        if (entityConfig.MaxSize.HasValue)
+            builder.AppendLine($"{indent1}max_size: {entityConfig.MaxSize.Value}");
     }
 
     private static void WriteSubscription(Subscription sub, StringBuilder builder)
     {
-        var ident = 8;
-        WriteQueue(sub, builder, ident);
+        var indent = 8;
+        WriteEntityConfig(sub, builder, indent);
         if (sub.Filters.Count > 0)
         {
-            var filtersIdent = CreateIdent(ident + 2);
-            builder.AppendLine($"{filtersIdent}filters:");
-            var filterIdent = CreateIdent(ident + 4);
-            var filterPropertyIdent = CreateIdent(ident + 6);
+            var filtersIndent = CreateIndent(indent + 2);
+            builder.AppendLine($"{filtersIndent}filters:");
+            var filterIndent = CreateIndent(indent + 4);
+            var filterPropertyIndent = CreateIndent(indent + 6);
             foreach (var filter in sub.Filters)
             {
                 if (filter is CorrelationFilter cf)
                 {
-                    builder.AppendLine($"{filterIdent}- type: correlation");
+                    builder.AppendLine($"{filterIndent}- type: correlation");
                     if (cf.CorrelationId is not null)
-                        builder.AppendLine($"{filterPropertyIdent}correlation_id: \"{cf.CorrelationId}\"");
+                        builder.AppendLine($"{filterPropertyIndent}correlation_id: \"{EscapeYamlString(cf.CorrelationId)}\"");
                     if (cf.MessageId is not null)
-                        builder.AppendLine($"{filterPropertyIdent}message_id: \"{cf.MessageId}\"");
+                        builder.AppendLine($"{filterPropertyIndent}message_id: \"{EscapeYamlString(cf.MessageId)}\"");
                     if (cf.To is not null)
-                        builder.AppendLine($"{filterPropertyIdent}to: \"{cf.To}\"");
+                        builder.AppendLine($"{filterPropertyIndent}to: \"{EscapeYamlString(cf.To)}\"");
                     if (cf.ReplyTo is not null)
-                        builder.AppendLine($"{filterPropertyIdent}reply_to: \"{cf.ReplyTo}\"");
+                        builder.AppendLine($"{filterPropertyIndent}reply_to: \"{EscapeYamlString(cf.ReplyTo)}\"");
                     if (cf.Subject is not null)
-                        builder.AppendLine($"{filterPropertyIdent}subject: \"{cf.Subject}\"");
+                        builder.AppendLine($"{filterPropertyIndent}subject: \"{EscapeYamlString(cf.Subject)}\"");
                     if (cf.ContentType is not null)
-                        builder.AppendLine($"{filterPropertyIdent}content_type: \"{cf.ContentType}\"");
+                        builder.AppendLine($"{filterPropertyIndent}content_type: \"{EscapeYamlString(cf.ContentType)}\"");
                     if (cf.Properties is { Count: > 0 })
                     {
-                        var propertyIdent = CreateIdent(ident + 8);
-                        builder.AppendLine($"{filterPropertyIdent}properties:");
+                        var propertyIndent = CreateIndent(indent + 8);
+                        builder.AppendLine($"{filterPropertyIndent}properties:");
                         foreach (var prop in cf.Properties)
                         {
-                            builder.AppendLine($"{propertyIdent}{prop.Key}: \"{prop.Value}\"");
+                            builder.AppendLine($"{propertyIndent}\"{EscapeYamlString(prop.Key)}\": \"{EscapeYamlString(prop.Value)}\"");
                         }
                     }
                 }
@@ -164,7 +169,12 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
         }
     }
     
-    private static string CreateIdent(int count) => string.Join("", Enumerable.Repeat(" ", count));
+    private static string EscapeYamlString(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+    
+    private static string CreateIndent(int count) => new(' ', count);
 }
 
 public sealed class Topology
@@ -173,7 +183,7 @@ public sealed class Topology
     public IReadOnlyList<Topic> Topics { get; init; } = [];
 }
 
-public class Queue
+public class BaseEntityConfig
 {
     public string Name { get; init; } = string.Empty;
     /// <summary>
@@ -198,13 +208,15 @@ public class Queue
     public int? MaxSize { get; init; }
 }
 
+public sealed class Queue : BaseEntityConfig;
+
 public sealed class Topic
 {
     public string Name { get; init; } = string.Empty;
     public IReadOnlyList<Subscription> Subscriptions { get; init; } = [];
 }
 
-public sealed class Subscription: Queue
+public sealed class Subscription: BaseEntityConfig
 {
    public IReadOnlyList<SubscriptionFilter> Filters { get; init; } = [];
 }

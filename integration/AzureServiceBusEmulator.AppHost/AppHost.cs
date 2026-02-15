@@ -20,7 +20,7 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
         Topics = [
             new Topic
             {
-                Name = "topic",
+                Name = "topic \"test\"",
                 Subscriptions = [
                     new Subscription
                     {
@@ -35,7 +35,7 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
                             {
                                 ContentType = "application/json",
                                 Subject = "sub-1",
-                                MessageId =  "message-1",
+                                MessageId =  "message\\1",
                                 To =  "sub-2",
                                 ReplyTo =  "sub-3",
                                 CorrelationId =  "sub-4",

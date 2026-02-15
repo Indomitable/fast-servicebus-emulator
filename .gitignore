@@ -5,3 +5,4 @@ obj/
 *.user
 vendor/azure-sdk-for-net/
 vendor/azure-sdk-for-net
+publish/
