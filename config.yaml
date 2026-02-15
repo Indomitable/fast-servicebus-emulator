@@ -33,15 +33,15 @@ topology:
     - name: "filter-topic"
       subscriptions:
         - name: "orders-sub"
-          filter:
-            type: correlation
-            subject: "order-created"
+          filters:
+            - type: correlation
+              subject: "order-created"
         - "all-sub"
     - name: "filter-appprop-topic"
       subscriptions:
         - name: "region-sub"
-          filter:
-            type: correlation
-            properties:
-              region: "us-east"
+          filters:
+            - type: correlation
+              properties:
+                region: "us-east"
         - "catch-all-sub"

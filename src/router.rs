@@ -24,7 +24,7 @@ use crate::config::{
     QueueConfig, SubscriptionEntry, SubscriptionFilter, Topology, DEFAULT_CHANNEL_CAPACITY,
 };
 use crate::store::{DlqStore, EntityConfig, MessageState, MessageStore};
-use crate::helpers::router_message::{stamp_broker_properties, matches_filter};
+use crate::helpers::router_message::{stamp_broker_properties, matches_filters};
 
 
 /// Type alias for a message routed through the stores.
@@ -36,7 +36,7 @@ struct SubscriptionInfo {
     /// The lowercased store key (e.g. `events-topic/subscriptions/sub-1`).
     key: String,
     /// Optional filter; `None` means accept all messages (default / TrueFilter).
-    filter: Option<SubscriptionFilter>,
+    filters: Vec<SubscriptionFilter>,
 }
 
 /// Immutable message router. Created once at startup from the topology
@@ -117,7 +117,7 @@ impl Router {
                 subscription_index.insert(key.clone(), key.clone());
                 sub_keys.push(SubscriptionInfo {
                     key,
-                    filter: sub.filter().cloned(),
+                    filters: sub.filters(),
                 });
             }
 
@@ -202,7 +202,7 @@ impl Router {
             let mut count = 0;
             for sub_info in subs {
                 // Check filter — None means accept all (TrueFilter)
-                if !matches_filter(&message, &sub_info.filter) {
+                if !matches_filters(&message, &sub_info.filters) {
                     debug!(
                         topic = address,
                         subscription = sub_info.key,

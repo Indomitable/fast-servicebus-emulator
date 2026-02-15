@@ -68,7 +68,7 @@ pub struct SubscriptionConfig {
     pub dead_lettering_on_message_expiration: bool,
     /// Optional filter rule for this subscription.
     #[serde(default)]
-    pub filter: Option<SubscriptionFilter>,
+    pub filters: Vec<SubscriptionFilter>,
     /// Maximum number of messages the store can hold. 0 = use DEFAULT_CHANNEL_CAPACITY.
     #[serde(default)]
     pub max_size: usize,
@@ -161,10 +161,10 @@ impl SubscriptionEntry {
     }
 
     /// Returns the subscription filter, if any.
-    pub fn filter(&self) -> Option<&SubscriptionFilter> {
+    pub fn filters(&self) -> Vec<SubscriptionFilter> {
         match self {
-            SubscriptionEntry::Name(_) => None,
-            SubscriptionEntry::Config(config) => config.filter.as_ref(),
+            SubscriptionEntry::Name(_) => vec![],
+            SubscriptionEntry::Config(config) => config.filters.clone(),
         }
     }
 
@@ -299,12 +299,14 @@ topology:
         subscriptions:
           - name: "high-priority"
             filter:
-              type: sql
-              expression: "priority = 'high'"
+              - type: sql
+                expression: "priority = 'high'"
 "#;
         let config = Config::from_yaml(yaml).unwrap();
         let sub = &config.topology.topics[0].subscriptions[0];
-        match sub.filter().unwrap() {
+        assert_eq!(sub.filters().len(), 1usize);
+        let filter = sub.filters().get(0).clone().unwrap().clone();
+        match filter {
             SubscriptionFilter::Sql { expression } => {
                 assert_eq!(expression, "priority = 'high'");
             }
@@ -314,6 +316,7 @@ topology:
 
     #[test]
     fn test_parse_topology_with_correlation_filter() {
+        //lang=yaml
         let yaml = r#"
 topology:
     queues: []
@@ -321,15 +324,17 @@ topology:
       - name: "events"
         subscriptions:
           - name: "by-subject"
-            filter:
-              type: correlation
-              subject: "order-created"
-              properties:
-                region: "us-east"
+            filters:
+              - type: correlation
+                subject: "order-created"
+                properties:
+                  region: "us-east"
 "#;
         let config = Config::from_yaml(yaml).unwrap();
         let sub = &config.topology.topics[0].subscriptions[0];
-        match sub.filter().unwrap() {
+        assert_eq!(sub.filters().len(), 1usize);
+        let filter = sub.filters().get(0).clone().unwrap().clone();
+        match filter {
             SubscriptionFilter::Correlation {
                 subject,
                 properties,

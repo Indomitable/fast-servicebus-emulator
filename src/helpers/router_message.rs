@@ -5,6 +5,16 @@ use crate::config::SubscriptionFilter;
 use crate::router::RouterMessage;
 use crate::store::LockToken;
 
+pub(crate) fn matches_filters(message: &RouterMessage, filters: &Vec<SubscriptionFilter>) -> bool {
+    for filter in filters {
+        if !matches_filter(message, filter) {
+            return false;
+        }
+    }
+    true
+}
+
+
 /// Checks whether a message matches a subscription filter.
 ///
 /// - `None` filter means accept all messages (equivalent to Azure's TrueFilter).
@@ -12,12 +22,7 @@ use crate::store::LockToken;
 ///   (correlation_id, message_id, to, reply_to, subject, content_type) and
 ///   custom application properties. All specified fields must match.
 /// - `Sql` filter is not implemented — logs a warning and accepts all messages.
-pub(crate) fn matches_filter(message: &RouterMessage, filter: &Option<SubscriptionFilter>) -> bool {
-    let filter = match filter {
-        None => return true,
-        Some(f) => f,
-    };
-
+fn matches_filter(message: &RouterMessage, filter: &SubscriptionFilter) -> bool {
     match filter {
         SubscriptionFilter::Correlation {
             correlation_id,
@@ -224,9 +229,78 @@ mod tests {
     // ── Correlation filter tests ──────────────────────────────────────
 
     #[test]
-    fn test_matches_filter_none_accepts_all() {
+    fn test_matches_filters_none_true() {
         let msg = test_message("anything");
-        assert!(matches_filter(&msg, &None));
+        assert!(matches_filters(&msg, &vec![]));
+    }
+
+    #[test]
+    fn test_matches_filters_accepts_all() {
+        let mut msg = test_message("anything");
+        let mut props = fe2o3_amqp_types::messaging::Properties::default();
+        props.subject = Some("order-created".to_string());
+        msg.properties = Some(props);
+        let app_properties = fe2o3_amqp_types::messaging::ApplicationProperties::builder()
+            .insert("region".to_string(), fe2o3_amqp_types::primitives::SimpleValue::String("us-east".to_string())).build();
+        msg.application_properties = Some(app_properties);
+
+        let filter1 = SubscriptionFilter::Correlation {
+            correlation_id: None,
+            message_id: None,
+            to: None,
+            reply_to: None,
+            subject: Some("order-created".to_string()),
+            content_type: None,
+            properties: HashMap::new(),
+        };
+        let filter2 = SubscriptionFilter::Correlation {
+            correlation_id: None,
+            message_id: None,
+            to: None,
+            reply_to: None,
+            subject: None,
+            content_type: None,
+            properties: HashMap::from([
+                ("region".to_string(), "us-east".to_string()),
+            ]),
+        };
+
+        assert!(matches_filters(&msg, &vec![filter1, filter2]));
+    }
+
+    #[test]
+    fn test_matches_filters_some_false() {
+        let mut msg = test_message("anything");
+        let app_properties = fe2o3_amqp_types::messaging::ApplicationProperties::builder()
+            .insert("region".to_string(), fe2o3_amqp_types::primitives::SimpleValue::String("us-east".to_string()))
+            .insert("from".to_string(), fe2o3_amqp_types::primitives::SimpleValue::String("service2".to_string()))
+            .build();
+        msg.application_properties = Some(app_properties);
+
+        let filter1 = SubscriptionFilter::Correlation {
+            correlation_id: None,
+            message_id: None,
+            to: None,
+            reply_to: None,
+            subject: None,
+            content_type: None,
+            properties: HashMap::from([
+                ("from".to_string(), "service1".to_string()),
+            ]),
+        };
+        let filter2 = SubscriptionFilter::Correlation {
+            correlation_id: None,
+            message_id: None,
+            to: None,
+            reply_to: None,
+            subject: None,
+            content_type: None,
+            properties: HashMap::from([
+                ("region".to_string(), "us-east".to_string()),
+            ]),
+        };
+
+        assert!(!matches_filters(&msg, &vec![filter1, filter2]));
     }
 
     #[test]
@@ -245,7 +319,7 @@ mod tests {
             content_type: None,
             properties: HashMap::new(),
         };
-        assert!(matches_filter(&msg, &Some(filter)));
+        assert!(matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -264,7 +338,7 @@ mod tests {
             content_type: None,
             properties: HashMap::new(),
         };
-        assert!(!matches_filter(&msg, &Some(filter)));
+        assert!(!matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -279,7 +353,7 @@ mod tests {
             content_type: None,
             properties: HashMap::new(),
         };
-        assert!(!matches_filter(&msg, &Some(filter)));
+        assert!(!matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -300,7 +374,7 @@ mod tests {
             content_type: None,
             properties: HashMap::new(),
         };
-        assert!(matches_filter(&msg, &Some(filter)));
+        assert!(matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -331,7 +405,7 @@ mod tests {
             content_type: None,
             properties: filter_props,
         };
-        assert!(matches_filter(&msg, &Some(filter)));
+        assert!(matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -356,7 +430,7 @@ mod tests {
             content_type: None,
             properties: filter_props,
         };
-        assert!(!matches_filter(&msg, &Some(filter)));
+        assert!(!matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -373,7 +447,7 @@ mod tests {
             content_type: None,
             properties: filter_props,
         };
-        assert!(!matches_filter(&msg, &Some(filter)));
+        assert!(!matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -403,7 +477,7 @@ mod tests {
             content_type: None,
             properties: filter_props,
         };
-        assert!(matches_filter(&msg, &Some(filter)));
+        assert!(matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -433,7 +507,7 @@ mod tests {
             content_type: None,
             properties: filter_props,
         };
-        assert!(!matches_filter(&msg, &Some(filter)));
+        assert!(!matches_filter(&msg, &filter));
     }
 
     #[test]
@@ -449,7 +523,7 @@ mod tests {
             content_type: None,
             properties: HashMap::new(),
         };
-        assert!(matches_filter(&msg, &Some(filter)));
+        assert!(matches_filter(&msg, &filter));
     }
 
     // --- Broker property stamping tests ---
