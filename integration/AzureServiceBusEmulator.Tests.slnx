@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="AzureServiceBusEmulator.AppHost/AzureServiceBusEmulator.AppHost.csproj" />
   <Project Path="AzureServiceBusEmulator.IntegrationTests/AzureServiceBusEmulator.IntegrationTests.csproj" />
-  <Project Path="FastServiceBusEmulator.Hosting/FastServiceBusEmulator.Hosting.csproj" />
+  <Project Path="FastServiceBusEmulator.Aspire.Hosting\FastServiceBusEmulator.Aspire.Hosting.csproj" />
+  <Project Path="FastServiceBusEmulatorTestProject/FastServiceBusEmulatorTestProject.csproj" />
 </Solution>

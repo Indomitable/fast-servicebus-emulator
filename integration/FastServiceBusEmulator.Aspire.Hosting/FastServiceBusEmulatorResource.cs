@@ -1,6 +1,6 @@
 using Aspire.Hosting.ApplicationModel;
 
-namespace FastServiceBusEmulator.Hosting;
+namespace FastServiceBusEmulator.Aspire.Hosting;
 
 /// <summary>
 /// Represents a Fast Service Bus Emulator container resource.

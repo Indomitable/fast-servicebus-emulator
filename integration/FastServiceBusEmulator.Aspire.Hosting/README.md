@@ -1,9 +1,18 @@
-using FastServiceBusEmulator.Aspire.Hosting;
-using Projects;
+# Fast Azure Service Bus Emulator
 
+A high-performance, lightweight Azure Service Bus emulator for integration testing.
+It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior required by official SDKs.
+
+## Features
+- **Protocol**: AMQP 1.0 over Plain TCP (Port 5672).
+- **Configuration**: Static configuration via `config.yaml`.
+- **Authentication**: Mocks CBS handshake (accepts any token).
+- **Message Delivery**: Simple "Fire and Forget" (ReceiveAndDelete) model using broadcast channels. No locking, no persistence.
+
+## Usage 
+```csharp
 var builder = DistributedApplication.CreateBuilder(args);
-
-var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
+builder.AddFastServiceBusEmulator("servicebus")
     .WithTopology(new Topology
     {
         Queues = [
@@ -20,7 +29,7 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
         Topics = [
             new Topic
             {
-                Name = "topic",
+                Name = "events-topic",
                 Subscriptions = [
                     new Subscription
                     {
@@ -47,18 +56,7 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
                     },
                     new Subscription { Name = "sub-2" }
                 ]
-            },
-            new Topic()
-            {
-                Name = "events",
-                Subscriptions = [
-                    new Subscription { Name = "sub-1" }
-                ]
             }
         ]
     });
-
-builder.AddProject<FastServiceBusEmulatorTestProject>("test-project")
-    .WithReference(serviceBus);
-
-builder.Build().Run();
+```

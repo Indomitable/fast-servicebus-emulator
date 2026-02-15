@@ -9,7 +9,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\FastServiceBusEmulator.Hosting\FastServiceBusEmulator.Hosting.csproj" IsAspireProjectResource="false" />
+        <ProjectReference Include="..\FastServiceBusEmulator.Aspire.Hosting\FastServiceBusEmulator.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+        <ProjectReference Include="..\FastServiceBusEmulatorTestProject\FastServiceBusEmulatorTestProject.csproj" />
     </ItemGroup>
 
 </Project>

@@ -1,0 +1,8 @@
+@baseUrl = http://localhost:5283
+
+POST {{baseUrl}}/message?message=test%20message
+
+
+###
+
+GET {{baseUrl}}/messages

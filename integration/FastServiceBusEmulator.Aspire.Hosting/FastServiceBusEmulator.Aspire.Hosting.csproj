@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>FastServiceBusEmulator.Aspire.Hosting</RootNamespace>
+    <PackageId>FastServiceBusEmulator.Aspire.Hosting</PackageId>
+    <Authors>Indomitable (https://github.com/Indomitable)</Authors>
+    <Description>
+      A high-performance, lightweight Azure Service Bus emulator for integration testing.
+      It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior required by official SDKs.
+    </Description>
+    <PackageProjectUrl>https://github.com/Indomitable/fast-servicebus-emulator</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Indomitable/fast-servicebus-emulator</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>Azure,ServiceBus,Emulator</PackageTags>
+    <Version>0.1.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.1.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

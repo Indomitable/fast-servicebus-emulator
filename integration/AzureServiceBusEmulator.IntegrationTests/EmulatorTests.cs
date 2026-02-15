@@ -9,7 +9,7 @@ namespace AzureServiceBusEmulator.IntegrationTests
         {
             var options = new ServiceBusClientOptions
             {
-                TransportType = ServiceBusTransportType.AmqpTcp
+                TransportType = ServiceBusTransportType.AmqpTcp,
             };
 
             // Create client

@@ -1,4 +1,4 @@
-# Custom Azure Service Bus Emulator (Rust)
+# Fast Azure Service Bus Emulator
 
 A high-performance, lightweight Azure Service Bus emulator for integration testing.
 It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior required by official SDKs.
