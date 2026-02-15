@@ -7,24 +7,22 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
     .WithTopology(new Topology
     {
         Queues = [
-            new Queue
+            new Queue("input-queue")
             {
-                Name = "input-queue",
                 DeadLetteringOnMessageExpiration = true,
                 LockDurationSeconds = 10,
                 MaxDeliveryCount = 3,
                 MaxSize = 100,
                 DefaultMessageTtlSeconds = 1000
-            }
+            },
+            new Queue("processing-queue")
         ],
         Topics = [
-            new Topic
+            new Topic("topic \"test\"")
             {
-                Name = "topic \"test\"",
                 Subscriptions = [
-                    new Subscription
+                    new Subscription("sub-1")
                     {
-                        Name = "sub-1",
                         DeadLetteringOnMessageExpiration = true,
                         LockDurationSeconds = 10,
                         MaxDeliveryCount = 3,
@@ -45,14 +43,13 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
                             }
                         ]
                     },
-                    new Subscription { Name = "sub-2" }
+                    new Subscription("sub-2")
                 ]
             },
-            new Topic()
+            new Topic("events")
             {
-                Name = "events",
                 Subscriptions = [
-                    new Subscription { Name = "sub-1" }
+                    new Subscription("sub-1")
                 ]
             }
         ]

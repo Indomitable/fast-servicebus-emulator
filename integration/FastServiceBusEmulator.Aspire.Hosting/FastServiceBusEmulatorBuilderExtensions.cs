@@ -19,10 +19,7 @@ public static class FastServiceBusEmulatorBuilderExtensions
     /// <param name="name">The name of the resource.</param>
     /// <param name="configPath">Optional host path to config.yaml to bind-mount into the container.</param>
     /// <returns>A resource builder for the emulator.</returns>
-    public static FastServiceBusEmulatorResourceBuilder AddFastServiceBusEmulator(
-        this IDistributedApplicationBuilder builder,
-        [ResourceName] string name,
-        string? configPath = null)
+    public static FastServiceBusEmulatorResourceBuilder AddFastServiceBusEmulator(this IDistributedApplicationBuilder builder, [ResourceName] string name)
     {
         var resource = new FastServiceBusEmulatorResource(name);
 
@@ -33,11 +30,6 @@ public static class FastServiceBusEmulatorBuilderExtensions
                 targetPort: FastServiceBusEmulatorResource.AmqpPort,
                 name: FastServiceBusEmulatorResource.AmqpEndpointName,
                 scheme: "tcp");
-
-        if (configPath is not null)
-        {
-            resourceBuilder = resourceBuilder.WithBindMount(configPath, "/config/config.yaml");
-        }
 
         return new FastServiceBusEmulatorResourceBuilder(resourceBuilder);
     }
@@ -74,94 +66,119 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
     private static string BuildTopology(Topology topology)
     {
         var configBuilder = new StringBuilder();
+        var indent = new IndentScope();
         configBuilder.AppendLine("topology:");
-        var indent0 = CreateIndent(2);
-        configBuilder.Append($"{indent0}queues:");
-        if (topology.Queues.Count == 0)
+        using (var queuesIndent = indent.Start())
         {
-            configBuilder.Append(" []");
-        }
-        configBuilder.AppendLine();
-        foreach (var queue in topology.Queues)
-        {
-            WriteEntityConfig(queue, configBuilder);
-        }
-        configBuilder.Append($"{indent0}topics:");
-        if (topology.Topics.Count == 0)
-        {
-            configBuilder.Append(" []");
-        }
-        configBuilder.AppendLine();
-        foreach (var topic in topology.Topics)
-        {
-            var indent1 = CreateIndent(4);
-            configBuilder.AppendLine($"{indent1}- name: \"{EscapeYamlString(topic.Name)}\"");
-            var indent2 = CreateIndent(6);
-            configBuilder.Append($"{indent2}subscriptions:");
-            if (topic.Subscriptions.Count == 0)
+            WriteCollection(queuesIndent, "queues", topology.Queues, configBuilder);
+            using (var queueIndent = queuesIndent.Start())
             {
-                configBuilder.Append(" []");
-            }
-            configBuilder.AppendLine();
-            foreach (var sub in topic.Subscriptions)
-            {
-                WriteSubscription(sub, configBuilder);
+                foreach (var queue in topology.Queues)
+                {
+                    WriteEntityConfig(queueIndent, queue, configBuilder);
+                }
             }
         }
+
+        using (var topicsIndent = indent.Start())
+        {
+            WriteCollection(topicsIndent, "topics", topology.Topics, configBuilder);
+            using (var topicIndent = topicsIndent.Start())
+            {
+                foreach (var topic in topology.Topics)
+                {
+                    configBuilder.AppendLine($"{topicIndent}- name: \"{EscapeYamlString(topic.Name)}\"");
+                    using (var subscriptionsIndent = topicIndent.Start())
+                    {
+                        WriteCollection(subscriptionsIndent, "subscriptions", topic.Subscriptions, configBuilder);
+                        using (var subscriptionIdent = subscriptionsIndent.Start())
+                        {
+                            foreach (var sub in topic.Subscriptions)
+                            {
+                                WriteSubscription(subscriptionIdent, sub, configBuilder);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return configBuilder.ToString();
     }
 
-    private static void WriteEntityConfig(BaseEntityConfig entityConfig, StringBuilder builder, int indent = 4)
+    private static void WriteCollection<T>(IndentScope indent, string name, IReadOnlyList<T> collection, StringBuilder builder)
     {
-        var indent0 = CreateIndent(indent);
-        var indent1 = CreateIndent(indent + 2);
-        builder.AppendLine($"{indent0}- name: \"{EscapeYamlString(entityConfig.Name)}\"");
-        if (entityConfig.LockDurationSeconds.HasValue)
-            builder.AppendLine($"{indent1}lock_duration_secs: {entityConfig.LockDurationSeconds.Value}");
-        if (entityConfig.MaxDeliveryCount.HasValue)
-            builder.AppendLine($"{indent1}max_delivery_count: {entityConfig.MaxDeliveryCount.Value}");
-        if (entityConfig.DefaultMessageTtlSeconds.HasValue)
-            builder.AppendLine($"{indent1}default_message_ttl_secs: {entityConfig.DefaultMessageTtlSeconds.Value}");
-        if (entityConfig.DeadLetteringOnMessageExpiration.HasValue)
-            builder.AppendLine($"{indent1}dead_lettering_on_message_expiration: {entityConfig.DeadLetteringOnMessageExpiration.Value.ToString().ToLowerInvariant()}");
-        if (entityConfig.MaxSize.HasValue)
-            builder.AppendLine($"{indent1}max_size: {entityConfig.MaxSize.Value}");
+        builder.Append($"{indent}{name}:");
+        if (collection.Count == 0)
+        {
+            builder.Append(" []");
+        }
+        builder.AppendLine();
     }
 
-    private static void WriteSubscription(Subscription sub, StringBuilder builder)
+    private static void WriteEntityConfig(IndentScope indent, BaseEntityConfig entityConfig, StringBuilder builder)
     {
-        var indent = 8;
-        WriteEntityConfig(sub, builder, indent);
+        builder.AppendLine($"{indent}- name: \"{EscapeYamlString(entityConfig.Name)}\"");
+        using var indentInner = indent.Start();
+        if (entityConfig.LockDurationSeconds.HasValue)
+            builder.AppendLine($"{indentInner}lock_duration_secs: {entityConfig.LockDurationSeconds.Value}");
+        if (entityConfig.MaxDeliveryCount.HasValue)
+            builder.AppendLine($"{indentInner}max_delivery_count: {entityConfig.MaxDeliveryCount.Value}");
+        if (entityConfig.DefaultMessageTtlSeconds.HasValue)
+            builder.AppendLine($"{indentInner}default_message_ttl_secs: {entityConfig.DefaultMessageTtlSeconds.Value}");
+        if (entityConfig.DeadLetteringOnMessageExpiration.HasValue)
+            builder.AppendLine($"{indentInner}dead_lettering_on_message_expiration: {entityConfig.DeadLetteringOnMessageExpiration.Value.ToString().ToLowerInvariant()}");
+        if (entityConfig.MaxSize.HasValue)
+            builder.AppendLine($"{indentInner}max_size: {entityConfig.MaxSize.Value}");
+    }
+
+    private static void WriteSubscription(IndentScope indent, Subscription sub, StringBuilder builder)
+    {
+        WriteEntityConfig(indent, sub, builder);
         if (sub.Filters.Count > 0)
         {
-            var filtersIndent = CreateIndent(indent + 2);
-            builder.AppendLine($"{filtersIndent}filters:");
-            var filterIndent = CreateIndent(indent + 4);
-            var filterPropertyIndent = CreateIndent(indent + 6);
-            foreach (var filter in sub.Filters)
+            using (var filtersIndent = indent.Start())
             {
-                if (filter is CorrelationFilter cf)
+                builder.AppendLine($"{filtersIndent}filters:");
+                using (var filterIndent = filtersIndent.Start())
                 {
-                    builder.AppendLine($"{filterIndent}- type: correlation");
-                    if (cf.CorrelationId is not null)
-                        builder.AppendLine($"{filterPropertyIndent}correlation_id: \"{EscapeYamlString(cf.CorrelationId)}\"");
-                    if (cf.MessageId is not null)
-                        builder.AppendLine($"{filterPropertyIndent}message_id: \"{EscapeYamlString(cf.MessageId)}\"");
-                    if (cf.To is not null)
-                        builder.AppendLine($"{filterPropertyIndent}to: \"{EscapeYamlString(cf.To)}\"");
-                    if (cf.ReplyTo is not null)
-                        builder.AppendLine($"{filterPropertyIndent}reply_to: \"{EscapeYamlString(cf.ReplyTo)}\"");
-                    if (cf.Subject is not null)
-                        builder.AppendLine($"{filterPropertyIndent}subject: \"{EscapeYamlString(cf.Subject)}\"");
-                    if (cf.ContentType is not null)
-                        builder.AppendLine($"{filterPropertyIndent}content_type: \"{EscapeYamlString(cf.ContentType)}\"");
-                    if (cf.Properties is { Count: > 0 })
+                    foreach (var filter in sub.Filters)
                     {
-                        var propertyIndent = CreateIndent(indent + 8);
-                        builder.AppendLine($"{filterPropertyIndent}properties:");
-                        foreach (var prop in cf.Properties)
+                        if (filter is CorrelationFilter cf)
                         {
-                            builder.AppendLine($"{propertyIndent}\"{EscapeYamlString(prop.Key)}\": \"{EscapeYamlString(prop.Value)}\"");
+                            builder.AppendLine($"{filterIndent}- type: correlation");
+                            using (var filterPropertyIndent = filterIndent.Start())
+                            {
+                                if (cf.CorrelationId is not null)
+                                    builder.AppendLine(
+                                        $"{filterPropertyIndent}correlation_id: \"{EscapeYamlString(cf.CorrelationId)}\"");
+                                if (cf.MessageId is not null)
+                                    builder.AppendLine(
+                                        $"{filterPropertyIndent}message_id: \"{EscapeYamlString(cf.MessageId)}\"");
+                                if (cf.To is not null)
+                                    builder.AppendLine($"{filterPropertyIndent}to: \"{EscapeYamlString(cf.To)}\"");
+                                if (cf.ReplyTo is not null)
+                                    builder.AppendLine(
+                                        $"{filterPropertyIndent}reply_to: \"{EscapeYamlString(cf.ReplyTo)}\"");
+                                if (cf.Subject is not null)
+                                    builder.AppendLine(
+                                        $"{filterPropertyIndent}subject: \"{EscapeYamlString(cf.Subject)}\"");
+                                if (cf.ContentType is not null)
+                                    builder.AppendLine(
+                                        $"{filterPropertyIndent}content_type: \"{EscapeYamlString(cf.ContentType)}\"");
+                                if (cf.Properties is { Count: > 0 })
+                                {
+                                    builder.AppendLine($"{filterPropertyIndent}properties:");
+                                    using (var propertyIndent = filterPropertyIndent.Start())
+                                    {
+                                        foreach (var prop in cf.Properties)
+                                        {
+                                            builder.AppendLine(
+                                                $"{propertyIndent}\"{EscapeYamlString(prop.Key)}\": \"{EscapeYamlString(prop.Value)}\"");
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -173,8 +190,35 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
     {
         return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
+}
+
+public class IndentScope(int indent = 0): IDisposable
+{
+    private int indent = indent;
+
+    private void Increase()
+    {
+        indent += 2;
+    }
+
+    private void Decrease()
+    {
+        indent -= 2;
+    }
     
-    private static string CreateIndent(int count) => new(' ', count);
+    public override string ToString() => new(' ', indent);
+
+    public IndentScope Start()
+    {
+        var scope = new IndentScope(indent);
+        scope.Increase();
+        return scope;
+    }
+    
+    public void Dispose()
+    {
+        Decrease();
+    }
 }
 
 public sealed class Topology
@@ -183,9 +227,9 @@ public sealed class Topology
     public IReadOnlyList<Topic> Topics { get; init; } = [];
 }
 
-public class BaseEntityConfig
+public class BaseEntityConfig(string name)
 {
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; } = name;
     /// <summary>
     /// Lock duration in seconds for PeekLock mode. Default: 30.
     /// </summary>
@@ -208,15 +252,15 @@ public class BaseEntityConfig
     public int? MaxSize { get; init; }
 }
 
-public sealed class Queue : BaseEntityConfig;
+public sealed class Queue(string name) : BaseEntityConfig(name);
 
-public sealed class Topic
+public sealed class Topic(string name)
 {
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; } = name;
     public IReadOnlyList<Subscription> Subscriptions { get; init; } = [];
 }
 
-public sealed class Subscription: BaseEntityConfig
+public sealed class Subscription(string name): BaseEntityConfig(name)
 {
    public IReadOnlyList<SubscriptionFilter> Filters { get; init; } = [];
 }

@@ -6,13 +6,13 @@ It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior req
 ## Usage 
 ```csharp
 var builder = DistributedApplication.CreateBuilder(args);
-builder.AddFastServiceBusEmulator("servicebus")
+
+var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
     .WithTopology(new Topology
     {
         Queues = [
-            new Queue
+            new Queue("input-queue")
             {
-                Name = "input-queue",
                 DeadLetteringOnMessageExpiration = true,
                 LockDurationSeconds = 10,
                 MaxDeliveryCount = 3,
@@ -21,13 +21,11 @@ builder.AddFastServiceBusEmulator("servicebus")
             }
         ],
         Topics = [
-            new Topic
+            new Topic("topic \"test\"")
             {
-                Name = "events-topic",
                 Subscriptions = [
-                    new Subscription
+                    new Subscription("sub-1")
                     {
-                        Name = "sub-1",
                         DeadLetteringOnMessageExpiration = true,
                         LockDurationSeconds = 10,
                         MaxDeliveryCount = 3,
@@ -38,7 +36,7 @@ builder.AddFastServiceBusEmulator("servicebus")
                             {
                                 ContentType = "application/json",
                                 Subject = "sub-1",
-                                MessageId =  "message-1",
+                                MessageId =  "message\\1",
                                 To =  "sub-2",
                                 ReplyTo =  "sub-3",
                                 CorrelationId =  "sub-4",
@@ -48,9 +46,21 @@ builder.AddFastServiceBusEmulator("servicebus")
                             }
                         ]
                     },
-                    new Subscription { Name = "sub-2" }
+                    new Subscription("sub-2")
+                ]
+            },
+            new Topic("events")
+            {
+                Subscriptions = [
+                    new Subscription("sub-1")
                 ]
             }
         ]
     });
+
+builder.AddProject<FastServiceBusEmulatorTestProject>("test-project")
+    .WithReference(serviceBus);
+
+builder.Build().Run();
+
 ```
