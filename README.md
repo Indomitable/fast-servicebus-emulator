@@ -4,10 +4,17 @@ A high-performance, lightweight Azure Service Bus emulator for integration testi
 It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior required by official SDKs.
 
 ## Features
-- **Protocol**: AMQP 1.0 over Plain TCP (Port 5672).
-- **Configuration**: Static configuration via `config.yaml`.
-- **Authentication**: Mocks CBS handshake (accepts any token).
-- **Message Delivery**: Simple "Fire and Forget" (ReceiveAndDelete) model using broadcast channels. No locking, no persistence.
+- **Protocol**: AMQP 1.0 over plain TCP (port 5672).
+- **Topology**: Static YAML topology (`config.yaml` / `CONFIG_PATH`) with queues, topics, and subscriptions.
+- **Mock auth**: SASL accepts any mechanism/credentials; CBS accepts any token (200 OK).
+- **Delivery modes**: ReceiveAndDelete and PeekLock.
+- **Settlement**: Complete/Abandon/Dead-letter; auto-dead-letter on `max_delivery_count`.
+- **DLQ**: `<entity>/$deadletterqueue` (also accepts `$DeadLetterQueue`).
+- **TTL**: Per-message TTL + per-entity default TTL; optional dead-letter-on-expiration.
+- **Backpressure**: Per-entity `max_size` rejects sends with `amqp:resource-limit-exceeded` when full.
+- **Subscription filters**: Correlation filters (system properties + application properties). SQL filters are parsed but not evaluated (warning, match-all).
+- **Compatibility workarounds**: Patches common Azure SDK quirks (e.g. missing `initial-delivery-count`, lock-token in delivery tag, always serialize header `delivery_count`).
+- **Operational**: Ctrl+C / SIGTERM stops accepting new connections.
 
 ## Configuration
 Edit `config.yaml` to define queues, topics and other configurations:
