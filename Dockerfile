@@ -32,11 +32,11 @@ RUN mkdir src && \
     echo 'fn main() {}' > src/main.rs && \
     echo 'pub mod config; pub mod server; pub mod router; pub mod sasl; pub mod cbs;' > src/lib.rs && \
     touch src/config.rs src/server.rs src/router.rs src/sasl.rs src/cbs.rs && \
-    # Configure linker to use clang (which xx hooks into) and lld for static linking
+    # Configure linker to use clang with the correct target architecture
     mkdir -p .cargo && \
     echo "[target.$(xx-info march)-unknown-linux-musl]" > .cargo/config.toml && \
     echo "linker = \"clang\"" >> .cargo/config.toml && \
-    echo "rustflags = [\"-C\", \"link-arg=-fuse-ld=lld\", \"-C\", \"target-feature=+crt-static\"]" >> .cargo/config.toml && \
+    echo "rustflags = [\"-C\", \"link-arg=-fuse-ld=lld\", \"-C\", \"link-arg=--target=$(xx-info triple)\", \"-C\", \"target-feature=+crt-static\"]" >> .cargo/config.toml && \
     # Build for the target architecture
     xx-cargo build --release --target $(xx-info march)-unknown-linux-musl || true && \
     rm -rf src
