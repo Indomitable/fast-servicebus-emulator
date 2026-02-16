@@ -184,7 +184,7 @@ impl DlqStore {
         let mut inner = self.inner.lock().await;
         inner.messages.push_back(envelope);
         drop(inner);
-        self.notify.notify_one();
+        self.notify.notify_waiters();
     }
 
     /// Enqueues an existing envelope into the DLQ, resetting its state.
@@ -196,7 +196,7 @@ impl DlqStore {
         let mut inner = self.inner.lock().await;
         inner.messages.push_back(envelope);
         drop(inner);
-        self.notify.notify_one();
+        self.notify.notify_waiters();
     }
 
     /// Receives a message from the DLQ in ReceiveAndDelete mode.
@@ -287,7 +287,7 @@ impl DlqStore {
                     if *lt == lock_token && Instant::now() < *locked_until {
                         inner.messages[idx].state = MessageState::Available;
                         drop(inner);
-                        self.notify.notify_one();
+                        self.notify.notify_waiters();
                         return SettlementResult::Abandoned;
                     }
                 }
@@ -421,7 +421,7 @@ impl MessageStore {
         self.logical_count.fetch_add(1, Ordering::Release);
         inner.messages.push_back(envelope);
         drop(inner);
-        self.notify.notify_one();
+        self.notify.notify_waiters();
         true
     }
 
@@ -545,7 +545,7 @@ impl MessageStore {
                             } else {
                                 inner.messages[idx].state = MessageState::Available;
                                 drop(inner);
-                                self.notify.notify_one();
+                                self.notify.notify_waiters();
                                 return SettlementResult::Abandoned;
                             }
                         } else {
@@ -675,7 +675,7 @@ impl MessageStore {
 
     /// Notifies waiting consumers (used when messages are added externally).
     pub fn notify_consumers(&self) {
-        self.notify.notify_one();
+        self.notify.notify_waiters();
     }
 
     /// Unlocks messages whose lock has expired, making them available again.

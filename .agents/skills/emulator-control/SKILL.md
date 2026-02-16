@@ -18,6 +18,11 @@ I provide full lifecycle management for the Azure Service Bus emulator:
 - Tail and search emulator logs
 - Verify AMQP port 5672 is listening
 
+## Prerequisites
+
+- The emulator is built and available at `./target/debug/fast-servicebus-emulator`
+- When sources are modified, the emulator needs to be rebuilt
+
 ## When to use me
 
 Use me whenever you need to control the emulator:
@@ -35,6 +40,11 @@ Use me whenever you need to control the emulator:
 Default (debug logging):
 ```bash
 RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
+```
+
+Run without building:
+```bash
+RUST_LOG=debug CONFIG_PATH=config.yaml cargo run --bin fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 ```
 
 If not yet built:

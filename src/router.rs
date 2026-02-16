@@ -13,11 +13,12 @@
 
 use anyhow::Result;
 use fe2o3_amqp::link::{Receiver, Sender};
+use fe2o3_amqp::Sendable;
 use fe2o3_amqp::types::messaging::{Body, Message};
 use fe2o3_amqp::types::primitives::{Value};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use fe2o3_amqp_types::definitions::{AmqpError, Error as AmqpErrorDef};
 use crate::config::{
@@ -393,6 +394,7 @@ pub async fn handle_outgoing_messages(
     loop {
         tokio::select! {
             envelope = store.receive_and_delete() => {
+                let seq = envelope.sequence_number;
                 let mut message = envelope.message;
                 stamp_broker_properties(
                     &mut message,
@@ -401,11 +403,28 @@ pub async fn handle_outgoing_messages(
                     envelope.delivery_count,
                     None, // No lock token in ReceiveAndDelete mode
                 );
-                debug!(address = %address, seq = envelope.sequence_number, "Forwarding message to client");
-                match sender.send(message).await {
-                    Ok(_) => {
-                        // Delivery confirmed — decrement logical queue depth
-                        store.confirm_removal();
+                
+                let mut delivery_tag = [0u8; 16];
+                // Use sequence number for uniqueness, padded to 16 bytes to satisfy potential GUID parsing
+                delivery_tag[8..16].copy_from_slice(&envelope.sequence_number.to_be_bytes());
+                
+                let sendable = Sendable::builder()
+                    .message(message)
+                    .settled(false)
+                    .delivery_tag(delivery_tag.to_vec())
+                    .build();
+                match sender.send_batchable(sendable).await {
+                    Ok(fut) => {
+                        match fut.await {
+                            Ok(_outcome) => {
+                                // Delivery confirmed — decrement logical queue depth
+                                store.confirm_removal();
+                            }
+                            Err(_e) => {
+                                store.confirm_removal();
+                                break;
+                            }
+                        }
                     }
                     Err(e) => {
                         debug!(address = %address, error = ?e, "Client disconnected");
@@ -648,4 +667,3 @@ pub async fn handle_outgoing_dlq_messages_peek_lock(
 
     Ok(())
 }
-

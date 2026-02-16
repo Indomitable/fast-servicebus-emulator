@@ -196,15 +196,15 @@ public class CorrelationFilterTests : BaseServiceBusTest
         var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
         Assert.Null(regionNext);
         
-        // var m1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-        // var m2 = await  catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-        // var m3 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-        //
-        // Assert.NotNull(m1);
-        // Assert.NotNull(m2);
-        // Assert.NotNull(m3);
+        var m1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var m2 = await  catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var m3 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
         
-        var allMessages = await catchAllReceiver.ReceiveMessagesAsync(3, TimeSpan.FromSeconds(10));
-        Assert.Equal(3, allMessages.Count);
+        Assert.NotNull(m1);
+        Assert.NotNull(m2);
+        Assert.NotNull(m3);
+        
+        // var allMessages = await catchAllReceiver.ReceiveMessagesAsync(3, TimeSpan.FromSeconds(10));
+        // Assert.Equal(3, allMessages.Count);
     }
 }
