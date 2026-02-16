@@ -33,7 +33,7 @@ Use me when you need to verify tests pass after making changes:
 ### Phase 1: Cleanup and build
 ```bash
 # Kill any running emulator
-kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null; sleep 1
+kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null; sleep 1
 
 # Verify port is free
 ss -tlnp | grep 5672
@@ -65,7 +65,7 @@ cargo test
 ### Phase 4: .NET integration tests (emulator MUST be running)
 ```bash
 # Start emulator in background
-RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 
 # Wait for startup
 sleep 2
@@ -86,7 +86,7 @@ dotnet test --no-build -v n --filter "TestMethodName"
 
 ### Phase 5: Cleanup
 ```bash
-kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null
+kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null
 ```
 
 ## Test categories
@@ -127,7 +127,7 @@ Connection string: `Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageS
 
 ### Port already in use
 - Symptom: `Address already in use (os error 98)`
-- Fix: Kill existing emulator: `kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null`
+- Fix: Kill existing emulator: `kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null`
 
 ### .NET tests timeout
 - Symptom: Tests hang or timeout after 30s

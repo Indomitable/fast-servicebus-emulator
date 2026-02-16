@@ -163,7 +163,7 @@ podman build -t localhost/servicebus-emulator .
 podman run -p 5672:5672 localhost/servicebus-emulator
 
 # Kill running emulator
-kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null
+kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null
 ```
 
 ## Environment Variables
@@ -194,5 +194,5 @@ tail -f /tmp/emulator.log
 ss -tlnp | grep 5672
 
 # Check if emulator is running
-pgrep -f azure-servicebus-emulator
+pgrep -f fast-servicebus-emulator
 ```

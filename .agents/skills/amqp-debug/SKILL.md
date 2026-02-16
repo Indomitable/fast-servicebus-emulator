@@ -53,8 +53,8 @@ Key patterns to look for:
 
 ### Step 3: Enable trace logging
 ```bash
-kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null; sleep 1
-RUST_LOG=trace CONFIG_PATH=config.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null; sleep 1
+RUST_LOG=trace CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 ```
 
 ### Step 4: Inspect AMQP frames in logs

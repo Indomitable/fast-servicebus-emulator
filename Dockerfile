@@ -19,7 +19,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install the target architecture for Rust
-RUN rustup target add $(xx-info rust-target-triple)
+RUN rustup target add $(xx-info march)-unknown-linux-musl
 
 WORKDIR /build
 
@@ -33,17 +33,17 @@ RUN mkdir src && \
     echo 'pub mod config; pub mod server; pub mod router; pub mod sasl; pub mod cbs;' > src/lib.rs && \
     touch src/config.rs src/server.rs src/router.rs src/sasl.rs src/cbs.rs && \
     # Build for the target architecture
-    xx-cargo build --release --target $(xx-info rust-target-triple) || true && \
+    xx-cargo build --release --target $(xx-info march)-unknown-linux-musl || true && \
     rm -rf src
 
 # Copy the real source and rebuild.
 COPY src/ src/
 RUN touch src/*.rs && \
-    xx-cargo build --release --target $(xx-info rust-target-triple) && \
+    xx-cargo build --release --target $(xx-info march)-unknown-linux-musl && \
     # Verify the binary architecture
-    xx-verify target/$(xx-info rust-target-triple)/release/fast-servicebus-emulator && \
+    xx-verify target/$(xx-info march)-unknown-linux-musl/release/fast-servicebus-emulator && \
     # Move binary to a predictable location for the next stage
-    cp target/$(xx-info rust-target-triple)/release/fast-servicebus-emulator /emulator
+    cp target/$(xx-info march)-unknown-linux-musl/release/fast-servicebus-emulator /emulator
 
 # ── Runtime ───────────────────────────────────────────────────────
 FROM scratch

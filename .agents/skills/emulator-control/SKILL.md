@@ -34,22 +34,22 @@ Use me whenever you need to control the emulator:
 
 Default (debug logging):
 ```bash
-RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 ```
 
 If not yet built:
 ```bash
-cargo build && RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+cargo build && RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 ```
 
 With custom config:
 ```bash
-RUST_LOG=debug CONFIG_PATH=/path/to/custom.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+RUST_LOG=debug CONFIG_PATH=/path/to/custom.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 ```
 
 With custom log level (trace, debug, info, warn, error):
 ```bash
-RUST_LOG=trace CONFIG_PATH=config.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+RUST_LOG=trace CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 ```
 
 After starting, always verify:
@@ -61,20 +61,20 @@ sleep 2 && ss -tlnp | grep 5672
 
 Graceful:
 ```bash
-kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null
+kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null
 ```
 
 Force (if graceful fails):
 ```bash
-kill -9 $(pgrep -f azure-servicebus-emulator) 2>/dev/null
+kill -9 $(pgrep -f fast-servicebus-emulator) 2>/dev/null
 ```
 
 ### Restart emulator
 
 ```bash
-kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null
+kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null
 sleep 1
-RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/azure-servicebus-emulator > /tmp/emulator.log 2>&1 &
+RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
 sleep 2
 ss -tlnp | grep 5672
 ```
@@ -83,7 +83,7 @@ ss -tlnp | grep 5672
 
 Process running:
 ```bash
-pgrep -f azure-servicebus-emulator
+pgrep -f fast-servicebus-emulator
 ```
 
 Port listening:
@@ -93,7 +93,7 @@ ss -tlnp | grep 5672
 
 Full health check (both process AND port):
 ```bash
-pgrep -f azure-servicebus-emulator && ss -tlnp | grep 5672 && echo "Emulator is healthy" || echo "Emulator is NOT running"
+pgrep -f fast-servicebus-emulator && ss -tlnp | grep 5672 && echo "Emulator is healthy" || echo "Emulator is NOT running"
 ```
 
 ### View logs
@@ -167,9 +167,9 @@ SQL filters are parsed but not evaluated (log warning, match all messages).
 
 - **Port**: 5672 (AMQP 1.0 over plain TCP, no TLS)
 - **Bind address**: 0.0.0.0 (all interfaces)
-- **Process name**: `azure-servicebus-emulator`
+- **Process name**: `fast-servicebus-emulator`
 - **Default log file**: `/tmp/emulator.log`
-- **Binary location**: `target/debug/azure-servicebus-emulator` (debug) or `target/release/azure-servicebus-emulator` (release)
+- **Binary location**: `target/debug/fast-servicebus-emulator` (debug) or `target/release/fast-servicebus-emulator` (release)
 
 ## Environment variables
 
@@ -182,7 +182,7 @@ SQL filters are parsed but not evaluated (log warning, match all messages).
 
 ### Port already in use
 - Symptom: `Address already in use (os error 98)`
-- Fix: `kill $(pgrep -f azure-servicebus-emulator) 2>/dev/null; sleep 1`
+- Fix: `kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null; sleep 1`
 
 ### Emulator crashes on startup
 - Symptom: Process exits immediately
