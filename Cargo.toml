@@ -18,3 +18,8 @@ uuid = { version = "1.21.0", features = ["v4"] }
 [dev-dependencies]
 fe2o3-amqp = { path = "vendor/fe2o3-amqp/fe2o3-amqp" }
 tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
+lto = true
+codegen-units = 1

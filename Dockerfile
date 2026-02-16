@@ -1,15 +1,29 @@
 # ── Builder ───────────────────────────────────────────────────────
-FROM rust:1-slim AS builder
+FROM --platform=$BUILDPLATFORM rust:1-slim AS builder
 
+# Install cross-compilation helpers
+COPY --from=tonistiigi/xx / /
+
+ARG TARGETPLATFORM
+
+# Install dependencies for cross-compilation
+# clang and lld are recommended for cross-compiling to musl with xx
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends musl-tools && \
-    rm -rf /var/lib/apt/lists/* && \
-    rustup target add x86_64-unknown-linux-musl
+    apt-get install -y --no-install-recommends \
+        clang \
+        lld \
+        musl-tools \
+        git \
+        file && \
+    xx-apt-get install -y musl-dev gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install the target architecture for Rust
+RUN rustup target add $(xx-info rust-target-triple)
 
 WORKDIR /build
 
 # Copy manifests and vendor source first for better layer caching.
-# Changes to src/ won't invalidate the dependency build layer.
 COPY Cargo.toml Cargo.lock ./
 COPY vendor/fe2o3-amqp/ vendor/fe2o3-amqp/
 
@@ -18,22 +32,23 @@ RUN mkdir src && \
     echo 'fn main() {}' > src/main.rs && \
     echo 'pub mod config; pub mod server; pub mod router; pub mod sasl; pub mod cbs;' > src/lib.rs && \
     touch src/config.rs src/server.rs src/router.rs src/sasl.rs src/cbs.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl || true && \
+    # Build for the target architecture
+    xx-cargo build --release --target $(xx-info rust-target-triple) || true && \
     rm -rf src
 
-# Copy the real source and rebuild. The `touch` ensures cargo sees
-# the real sources as newer than the dummy-built artefacts.
+# Copy the real source and rebuild.
 COPY src/ src/
 RUN touch src/*.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl && \
-    strip /build/target/x86_64-unknown-linux-musl/release/fast-servicebus-emulator
+    xx-cargo build --release --target $(xx-info rust-target-triple) && \
+    # Verify the binary architecture
+    xx-verify target/$(xx-info rust-target-triple)/release/fast-servicebus-emulator && \
+    # Move binary to a predictable location for the next stage
+    cp target/$(xx-info rust-target-triple)/release/fast-servicebus-emulator /emulator
 
 # ── Runtime ───────────────────────────────────────────────────────
 FROM scratch
 
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/fast-servicebus-emulator /emulator
-
-# Ship the default topology so the image works out of the box.
+COPY --from=builder /emulator /emulator
 COPY config-sample.yaml /config/config.yaml
 
 ENV CONFIG_PATH=/config/config.yaml
