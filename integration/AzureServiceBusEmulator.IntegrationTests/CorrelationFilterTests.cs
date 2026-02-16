@@ -128,4 +128,83 @@ public class CorrelationFilterTests : BaseServiceBusTest
         var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
         Assert.Null(regionNext);
     }
+    
+    /// <summary>
+    /// Send messages with different application properties to filter-appprop-topic.
+    /// The region-sub (filtered on properties.region = "us-east") should only get
+    /// messages with that property. The catch-all-sub gets all messages.
+    /// </summary>
+    [Fact]
+    public async Task Correlation_Filter_Routes_By_ApplicationProperty_OneFilter()
+    {
+        var options = new ServiceBusClientOptions
+        {
+            TransportType = ServiceBusTransportType.AmqpTcp
+        };
+
+        await using var client = new ServiceBusClient(ConnectionString, options);
+        var sender = client.CreateSender(FilterMultiTopic);
+
+        var regionReceiver = client.CreateReceiver(FilterMultiTopic, FilterRegionSubMulti, new ServiceBusReceiverOptions
+        {
+            ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
+        });
+        var catchAllReceiver = client.CreateReceiver(FilterMultiTopic, FilterCatchAllSub, new ServiceBusReceiverOptions
+        {
+            ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
+        });
+
+        var regBody1 = $"region-1-{Guid.NewGuid()}";
+        var regMsg1 = new ServiceBusMessage(regBody1)
+        {
+            ApplicationProperties =
+            {
+                ["region"] = "eu-east"
+            }
+        };
+        await sender.SendMessageAsync(regMsg1);
+
+        var regBody2 = $"region-2-{Guid.NewGuid()}";
+        var regMsg2 = new ServiceBusMessage(regBody2)
+        {
+            ApplicationProperties =
+            {
+                ["region"] = "canada-central"
+            }
+        };
+        await sender.SendMessageAsync(regMsg2);
+        
+        
+        var regBody3 = $"region-3-{Guid.NewGuid()}";
+        var regMsg3 = new ServiceBusMessage(regBody3)
+        {
+            ApplicationProperties =
+            {
+                ["region"] = "japan-east"
+            }
+        };
+        await sender.SendMessageAsync(regMsg3);
+
+        var regionMsg1 = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        Assert.NotNull(regionMsg1);
+        var regionMsg2 = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        Assert.NotNull(regionMsg2);
+        string[] bodies = [regionMsg1.Body.ToString(), regionMsg2.Body.ToString()];
+        Assert.Contains(regBody1, bodies);
+        Assert.Contains(regBody2, bodies);
+        
+        var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        Assert.Null(regionNext);
+        
+        // var m1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        // var m2 = await  catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        // var m3 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        //
+        // Assert.NotNull(m1);
+        // Assert.NotNull(m2);
+        // Assert.NotNull(m3);
+        
+        var allMessages = await catchAllReceiver.ReceiveMessagesAsync(3, TimeSpan.FromSeconds(10));
+        Assert.Equal(3, allMessages.Count);
+    }
 }

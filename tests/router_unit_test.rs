@@ -390,9 +390,9 @@ topology:
               type: correlation
               subject: "high"
           - name: "low-priority"
-            filter:
-              type: correlation
-              subject: "low"
+            filters:
+              - type: correlation
+                subject: "low"
           - name: "all-orders"
 "#;
     let config = Config::from_yaml(yaml).unwrap();
@@ -454,10 +454,10 @@ topology:
               properties:
                 region: "us-east"
           - name: "eu-only"
-            filter:
-              type: correlation
-              properties:
-                region: "eu-west"
+            filters:
+              - type: correlation
+                properties:
+                  region: "eu-west"
 "#;
     let config = Config::from_yaml(yaml).unwrap();
     let router = Router::from_topology(&config.topology);
@@ -502,9 +502,9 @@ topology:
       - name: "events"
         subscriptions:
           - name: "filtered"
-            filter:
-              type: correlation
-              subject: "special"
+            filters:
+              - type: correlation
+                subject: "special"
 "#;
     let config = Config::from_yaml(yaml).unwrap();
     let router = Router::from_topology(&config.topology);

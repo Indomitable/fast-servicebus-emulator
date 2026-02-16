@@ -298,7 +298,7 @@ topology:
       - name: "orders"
         subscriptions:
           - name: "high-priority"
-            filter:
+            filters:
               - type: sql
                 expression: "priority = 'high'"
 "#;
@@ -388,7 +388,7 @@ topology:
     fn test_load_topology_file() {
         let topology = Config::load("config.yaml").unwrap().topology;
         assert_eq!(topology.queues.len(), 12);
-        assert_eq!(topology.topics.len(), 4);
+        assert_eq!(topology.topics.len(), 5);
     }
 
     #[test]

@@ -45,3 +45,14 @@ topology:
               properties:
                 region: "us-east"
         - "catch-all-sub"
+    - name: multi-filter-topic
+      subscriptions:
+        - "catch-all-sub"
+        - name: "region-multi-filters-sub"
+          filters:
+            - type: correlation
+              properties:
+                region: "eu-east"
+            - type: correlation
+              properties:
+                region: "canada-central"

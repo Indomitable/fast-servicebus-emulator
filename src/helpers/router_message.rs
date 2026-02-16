@@ -6,6 +6,9 @@ use crate::router::RouterMessage;
 use crate::store::LockToken;
 
 pub(crate) fn matches_filters(message: &RouterMessage, filters: &Vec<SubscriptionFilter>) -> bool {
+    if filters.len() == 0 {
+        return true;
+    }
     for filter in filters {
         if matches_filter(message, filter) {
             return true;

@@ -35,4 +35,6 @@ public class BaseServiceBusTest
     protected const string FilterAppPropTopic = "filter-appprop-topic";
     protected const string FilterRegionSub = "region-sub";   // filter: properties.region = "us-east"
     protected const string FilterCatchAllSub = "catch-all-sub"; // no filter (catch-all)
+    protected const string FilterMultiTopic = "multi-filter-topic";
+    protected const string FilterRegionSubMulti = "region-multi-filters-sub"; // has multiple filters.
 }
