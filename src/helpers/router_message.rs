@@ -7,11 +7,11 @@ use crate::store::LockToken;
 
 pub(crate) fn matches_filters(message: &RouterMessage, filters: &Vec<SubscriptionFilter>) -> bool {
     for filter in filters {
-        if !matches_filter(message, filter) {
-            return false;
+        if matches_filter(message, filter) {
+            return true;
         }
     }
-    true
+    false
 }
 
 
@@ -235,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn test_matches_filters_accepts_all() {
+    fn test_matches_filters_none_match_false() {
         let mut msg = test_message("anything");
         let mut props = fe2o3_amqp_types::messaging::Properties::default();
         props.subject = Some("order-created".to_string());
@@ -249,7 +249,7 @@ mod tests {
             message_id: None,
             to: None,
             reply_to: None,
-            subject: Some("order-created".to_string()),
+            subject: Some("order-modified".to_string()),
             content_type: None,
             properties: HashMap::new(),
         };
@@ -261,15 +261,15 @@ mod tests {
             subject: None,
             content_type: None,
             properties: HashMap::from([
-                ("region".to_string(), "us-east".to_string()),
+                ("region".to_string(), "us-west".to_string()),
             ]),
         };
 
-        assert!(matches_filters(&msg, &vec![filter1, filter2]));
+        assert!(!matches_filters(&msg, &vec![filter1, filter2]));
     }
 
     #[test]
-    fn test_matches_filters_some_false() {
+    fn test_matches_filters_some_true() {
         let mut msg = test_message("anything");
         let app_properties = fe2o3_amqp_types::messaging::ApplicationProperties::builder()
             .insert("region".to_string(), fe2o3_amqp_types::primitives::SimpleValue::String("us-east".to_string()))
@@ -300,7 +300,7 @@ mod tests {
             ]),
         };
 
-        assert!(!matches_filters(&msg, &vec![filter1, filter2]));
+        assert!(matches_filters(&msg, &vec![filter1, filter2]));
     }
 
     #[test]

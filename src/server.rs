@@ -95,17 +95,17 @@ impl Server {
 
 /// Handles a single TCP connection: SASL handshake, AMQP connection, and sessions.
 async fn handle_connection(stream: tokio::net::TcpStream, router: SharedRouter) -> Result<()> {
-    let acceptor = ConnectionAcceptor::builder()
+    let connection_acceptor = ConnectionAcceptor::builder()
         .container_id("fast-servicebus-emulator")
         .max_frame_size(1024 * 1024u32)
         .sasl_acceptor(MockSaslAcceptor)
         .build();
 
-    let mut connection = acceptor.accept(stream).await?;
+    let mut connection = connection_acceptor.accept(stream).await?;
     debug!("AMQP connection established");
 
     // Accept sessions until the connection is closed.
-    let session_acceptor = SessionAcceptor::new();
+    let session_acceptor = SessionAcceptor::builder().build();
     loop {
         match session_acceptor.accept(&mut connection).await {
             Ok(mut session) => {
