@@ -1,6 +1,10 @@
 namespace AzureServiceBusEmulator.IntegrationTests;
 
-public class BaseServiceBusTest
+[CollectionDefinition(nameof(ServiceBusCollection))]
+public class ServiceBusCollection;
+
+[Collection(nameof(ServiceBusCollection))]
+public class BaseServiceBusTest //: IAsyncLifetime
 {
     protected const string ConnectionString = "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
 
@@ -51,4 +55,29 @@ public class BaseServiceBusTest
             await Task.Delay(TimeSpan.FromMilliseconds(50), token);
         }
     }
+
+    protected readonly HttpClient AdminHttpClient;
+    private const string AdminBaseUrl = "http://localhost:45672";
+
+    protected BaseServiceBusTest()
+    {
+        AdminHttpClient = new HttpClient();
+        AdminHttpClient.BaseAddress = new Uri(AdminBaseUrl);
+        AdminHttpClient.DeleteAsync($"/testing/messages").GetAwaiter().GetResult();
+    }
+    
+    // private async Task ClearAllMessages()
+    // {
+    //     await ;
+    // }
+
+    // public async Task InitializeAsync()
+    // {
+    //     await ClearAllMessages();
+    // }
+    //
+    // public Task DisposeAsync()
+    // {
+    //     return Task.CompletedTask;
+    // }
 }

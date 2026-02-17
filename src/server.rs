@@ -42,6 +42,11 @@ impl Server {
         }
     }
 
+    /// Returns a shared reference to the router.
+    pub fn router(&self) -> SharedRouter {
+        self.router.clone()
+    }
+
     /// Starts listening for AMQP connections on `0.0.0.0:5672`.
     pub async fn run(&self) -> Result<()> {
         self.run_on("0.0.0.0:5672").await

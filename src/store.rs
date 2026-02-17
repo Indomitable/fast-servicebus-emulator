@@ -20,6 +20,8 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use serde::ser::SerializeStruct;
+use serde::Serialize;
 use tokio::sync::{Mutex, Notify};
 use uuid::Uuid;
 
@@ -32,13 +34,14 @@ pub type LockToken = Uuid;
 pub type SequenceNumber = u64;
 
 /// State of a message in the store.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum MessageState {
     /// Available for delivery.
     Available,
     /// Locked by a consumer. Contains the lock expiry instant and lock token.
     Locked {
         lock_token: LockToken,
+        #[serde(skip)] // Instant is not serializable
         locked_until: Instant,
     },
 }
@@ -58,6 +61,27 @@ pub struct Envelope {
     pub state: MessageState,
     /// Optional TTL. If set, the message expires at `enqueued_time_utc + ttl_ms`.
     pub ttl_ms: Option<u64>,
+}
+
+impl Serialize for Envelope {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Envelope", 6)?;
+        state.serialize_field("sequence_number", &self.sequence_number)?;
+        state.serialize_field("enqueued_time_utc", &self.enqueued_time_utc)?;
+        state.serialize_field("delivery_count", &self.delivery_count)?;
+        state.serialize_field("state", &self.state)?;
+        state.serialize_field("ttl_ms", &self.ttl_ms)?;
+        
+        // Simplify message serialization for the API
+        // We use debug format for simplicity as full AMQP JSON serialization is complex
+        let msg_display = format!("{:?}", self.message);
+        state.serialize_field("message_debug", &msg_display)?;
+        
+        state.end()
+    }
 }
 
 impl Envelope {
@@ -318,6 +342,21 @@ impl DlqStore {
     /// Returns true if the DLQ is empty.
     pub async fn is_empty(&self) -> bool {
         self.inner.lock().await.messages.is_empty()
+    }
+
+    /// Clears all messages from the DLQ. Returns the number of removed messages.
+    pub async fn clear(&self) -> usize {
+        let mut inner = self.inner.lock().await;
+        let count = inner.messages.len();
+        inner.messages.clear();
+        inner.lock_index.clear();
+        count
+    }
+
+    /// Returns a snapshot of all messages in the DLQ.
+    pub async fn snapshot(&self) -> Vec<Envelope> {
+        let inner = self.inner.lock().await;
+        inner.messages.iter().cloned().collect()
     }
 }
 
@@ -750,6 +789,22 @@ impl MessageStore {
                 dlq.enqueue(envelope.message).await;
             }
         }
+    }
+
+    /// Clears all messages from the store. Returns the number of removed messages.
+    pub async fn clear(&self) -> usize {
+        let mut inner = self.inner.lock().await;
+        let count = inner.messages.len();
+        inner.messages.clear();
+        inner.lock_index.clear();
+        self.logical_count.store(0, Ordering::Release);
+        count
+    }
+
+    /// Returns a snapshot of all messages in the store.
+    pub async fn snapshot(&self) -> Vec<Envelope> {
+        let inner = self.inner.lock().await;
+        inner.messages.iter().cloned().collect()
     }
 }
 

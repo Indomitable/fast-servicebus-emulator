@@ -289,6 +289,37 @@ impl Router {
         let lower = address.to_lowercase();
         lower.ends_with("/$deadletterqueue")
     }
+
+    /// Returns all message stores (queues and subscriptions).
+    pub fn get_all_stores(&self) -> Vec<(&String, Arc<MessageStore>)> {
+        self.stores.iter().map(|(k, v)| (k, v.clone())).collect()
+    }
+
+    /// Returns the message store for the given queue name.
+    pub fn get_queue_store(&self, name: &str) -> Option<Arc<MessageStore>> {
+        self.stores.get(name).cloned()
+    }
+
+    /// Returns all subscription stores for a given topic.
+    pub fn get_topic_subscriptions(&self, topic_name: &str) -> Vec<(String, Arc<MessageStore>)> {
+        if let Some(subs) = self.topic_subscriptions.get(topic_name) {
+            subs.iter()
+                .filter_map(|info| {
+                    self.stores
+                        .get(&info.key)
+                        .map(|store| (info.key.clone(), store.clone()))
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Returns the message store for a specific subscription.
+    pub fn get_subscription_store(&self, topic: &str, sub: &str) -> Option<Arc<MessageStore>> {
+        let key = format!("{}/subscriptions/{}", topic, sub).to_lowercase();
+        self.stores.get(&key).cloned()
+    }
 }
 
 /// Result of publishing a message to the router.
