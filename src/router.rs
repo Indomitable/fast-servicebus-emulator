@@ -18,7 +18,7 @@ use fe2o3_amqp::types::messaging::{Body, Message};
 use fe2o3_amqp::types::primitives::{Value};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use fe2o3_amqp_types::definitions::{AmqpError, Error as AmqpErrorDef};
 use crate::config::{
@@ -394,7 +394,6 @@ pub async fn handle_outgoing_messages(
     loop {
         tokio::select! {
             envelope = store.receive_and_delete() => {
-                let seq = envelope.sequence_number;
                 let mut message = envelope.message;
                 stamp_broker_properties(
                     &mut message,
@@ -413,18 +412,10 @@ pub async fn handle_outgoing_messages(
                     .settled(false)
                     .delivery_tag(delivery_tag.to_vec())
                     .build();
-                match sender.send_batchable(sendable).await {
-                    Ok(fut) => {
-                        match fut.await {
-                            Ok(_outcome) => {
-                                // Delivery confirmed — decrement logical queue depth
-                                store.confirm_removal();
-                            }
-                            Err(_e) => {
-                                store.confirm_removal();
-                                break;
-                            }
-                        }
+                match sender.send(sendable).await {
+                    Ok(_) => {
+                        // Delivery confirmed — decrement logical queue depth
+                        store.confirm_removal();
                     }
                     Err(e) => {
                         debug!(address = %address, error = ?e, "Client disconnected");

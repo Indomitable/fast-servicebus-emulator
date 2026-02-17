@@ -23,7 +23,7 @@ public class BackpressureTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(BackpressureQueue);
+        await using var sender = client.CreateSender(BackpressureQueue);
 
         // Drain any leftover messages from previous tests
         var drainReceiver = client.CreateReceiver(BackpressureQueue, new ServiceBusReceiverOptions

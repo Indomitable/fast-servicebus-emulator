@@ -30,7 +30,7 @@ public class LinkCreditTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PrefetchQueue);
+        await using var sender = client.CreateSender(PrefetchQueue);
 
         // Send 5 messages
         const int messageCount = 5;
@@ -43,7 +43,7 @@ public class LinkCreditTests : BaseServiceBusTest
         }
 
         // Create receiver with default PrefetchCount (0 = on-demand credit)
-        var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             PrefetchCount = 0
@@ -83,7 +83,7 @@ public class LinkCreditTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PrefetchQueue);
+        await using var sender = client.CreateSender(PrefetchQueue);
 
         // Send 10 messages
         const int messageCount = 10;
@@ -97,7 +97,7 @@ public class LinkCreditTests : BaseServiceBusTest
 
         // Create receiver with PrefetchCount = 5
         // This tells the SDK to grant 5 credits up front
-        var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             PrefetchCount = 5
@@ -136,7 +136,7 @@ public class LinkCreditTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PrefetchQueue);
+        await using var sender = client.CreateSender(PrefetchQueue);
 
         // Send 5 messages
         const int messageCount = 5;
@@ -149,7 +149,7 @@ public class LinkCreditTests : BaseServiceBusTest
         }
 
         // Create receiver with PrefetchCount = 1
-        var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             PrefetchCount = 1
@@ -185,7 +185,7 @@ public class LinkCreditTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PrefetchQueue);
+        await using var sender = client.CreateSender(PrefetchQueue);
 
         // Send exactly 3 messages
         const int messageCount = 3;
@@ -194,7 +194,7 @@ public class LinkCreditTests : BaseServiceBusTest
             await sender.SendMessageAsync(new ServiceBusMessage($"bounded-{i}-{Guid.NewGuid()}"));
         }
 
-        var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             PrefetchCount = 10 // More credit than messages available

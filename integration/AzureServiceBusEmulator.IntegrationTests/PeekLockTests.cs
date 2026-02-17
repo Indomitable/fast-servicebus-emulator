@@ -21,10 +21,10 @@ public class PeekLockTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PeekLockCompleteQueue);
+        await using var sender = client.CreateSender(PeekLockCompleteQueue);
 
         // Create PeekLock receiver
-        var receiver = client.CreateReceiver(PeekLockCompleteQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PeekLockCompleteQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock
         });
@@ -59,9 +59,9 @@ public class PeekLockTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PeekLockAbandonQueue);
+        await using var sender = client.CreateSender(PeekLockAbandonQueue);
 
-        var receiver = client.CreateReceiver(PeekLockAbandonQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PeekLockAbandonQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock
         });
@@ -98,9 +98,9 @@ public class PeekLockTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PeekLockDeliveryCountQueue);
+        await using var sender = client.CreateSender(PeekLockDeliveryCountQueue);
 
-        var receiver = client.CreateReceiver(PeekLockDeliveryCountQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PeekLockDeliveryCountQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock
         });
@@ -140,9 +140,9 @@ public class PeekLockTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(PeekLockBrokerPropsQueue);
+        await using var sender = client.CreateSender(PeekLockBrokerPropsQueue);
 
-        var receiver = client.CreateReceiver(PeekLockBrokerPropsQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(PeekLockBrokerPropsQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock
         });

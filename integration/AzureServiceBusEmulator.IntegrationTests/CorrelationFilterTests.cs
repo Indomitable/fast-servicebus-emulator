@@ -31,14 +31,14 @@ public class CorrelationFilterTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(FilterTopic);
+        await using var sender = client.CreateSender(FilterTopic);
 
         // Create receivers
-        var ordersReceiver = client.CreateReceiver(FilterTopic, FilterOrdersSub, new ServiceBusReceiverOptions
+        await using var ordersReceiver = client.CreateReceiver(FilterTopic, FilterOrdersSub, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
-        var allReceiver = client.CreateReceiver(FilterTopic, FilterAllSub, new ServiceBusReceiverOptions
+        await using var allReceiver = client.CreateReceiver(FilterTopic, FilterAllSub, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
@@ -86,14 +86,14 @@ public class CorrelationFilterTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(FilterAppPropTopic);
+        await using var sender = client.CreateSender(FilterAppPropTopic);
 
         // Create receivers
-        var regionReceiver = client.CreateReceiver(FilterAppPropTopic, FilterRegionSub, new ServiceBusReceiverOptions
+        await using var regionReceiver = client.CreateReceiver(FilterAppPropTopic, FilterRegionSub, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
-        var catchAllReceiver = client.CreateReceiver(FilterAppPropTopic, FilterCatchAllSub, new ServiceBusReceiverOptions
+        await using var catchAllReceiver = client.CreateReceiver(FilterAppPropTopic, FilterCatchAllSub, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
@@ -143,13 +143,13 @@ public class CorrelationFilterTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(FilterMultiTopic);
+        await using var sender = client.CreateSender(FilterMultiTopic);
 
-        var regionReceiver = client.CreateReceiver(FilterMultiTopic, FilterRegionSubMulti, new ServiceBusReceiverOptions
+        await using var regionReceiver = client.CreateReceiver(FilterMultiTopic, FilterRegionSubMulti, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
-        var catchAllReceiver = client.CreateReceiver(FilterMultiTopic, FilterCatchAllSub, new ServiceBusReceiverOptions
+        await using var catchAllReceiver = client.CreateReceiver(FilterMultiTopic, FilterCatchAllSub, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });

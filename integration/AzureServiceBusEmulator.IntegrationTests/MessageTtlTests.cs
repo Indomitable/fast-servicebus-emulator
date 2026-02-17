@@ -22,7 +22,7 @@ public class MessageTtlTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(TtlDiscardQueue);
+        await using var sender = client.CreateSender(TtlDiscardQueue);
 
         // Send a message with 1-second TTL
         var messageBody = $"ttl-discard-{Guid.NewGuid()}";
@@ -36,7 +36,7 @@ public class MessageTtlTests : BaseServiceBusTest
         await Task.Delay(TimeSpan.FromSeconds(3));
 
         // Try to receive — should return null (expired and discarded)
-        var receiver = client.CreateReceiver(TtlDiscardQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(TtlDiscardQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
@@ -58,7 +58,7 @@ public class MessageTtlTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(TtlDlqQueue);
+        await using var sender = client.CreateSender(TtlDlqQueue);
 
         // Send a message (no per-message TTL — uses entity default of 2 seconds)
         var messageBody = $"ttl-dlq-{Guid.NewGuid()}";
@@ -68,7 +68,7 @@ public class MessageTtlTests : BaseServiceBusTest
         await Task.Delay(TimeSpan.FromSeconds(4));
 
         // Main queue should be empty — message expired
-        var receiver = client.CreateReceiver(TtlDlqQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(TtlDlqQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
@@ -76,7 +76,7 @@ public class MessageTtlTests : BaseServiceBusTest
         Assert.Null(mainMsg);
 
         // DLQ should have the message
-        var dlqReceiver = client.CreateReceiver(TtlDlqQueue, new ServiceBusReceiverOptions
+        await using var dlqReceiver = client.CreateReceiver(TtlDlqQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             SubQueue = SubQueue.DeadLetter

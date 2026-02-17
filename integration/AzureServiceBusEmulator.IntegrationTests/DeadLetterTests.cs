@@ -23,16 +23,16 @@ public class DeadLetterTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(DlqExplicitQueue);
+        await using var sender = client.CreateSender(DlqExplicitQueue);
 
         // PeekLock receiver on main queue
-        var receiver = client.CreateReceiver(DlqExplicitQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(DlqExplicitQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock
         });
 
         // DLQ receiver (ReceiveAndDelete for simplicity)
-        var dlqReceiver = client.CreateReceiver(DlqExplicitQueue, new ServiceBusReceiverOptions
+        await using var dlqReceiver = client.CreateReceiver(DlqExplicitQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             SubQueue = SubQueue.DeadLetter
@@ -75,16 +75,16 @@ public class DeadLetterTests : BaseServiceBusTest
         };
 
         await using var client = new ServiceBusClient(ConnectionString, options);
-        var sender = client.CreateSender(DlqAutoQueue);
+        await using var sender = client.CreateSender(DlqAutoQueue);
 
         // PeekLock receiver on main queue
-        var receiver = client.CreateReceiver(DlqAutoQueue, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(DlqAutoQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.PeekLock
         });
 
         // DLQ receiver
-        var dlqReceiver = client.CreateReceiver(DlqAutoQueue, new ServiceBusReceiverOptions
+        await using var dlqReceiver = client.CreateReceiver(DlqAutoQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             SubQueue = SubQueue.DeadLetter

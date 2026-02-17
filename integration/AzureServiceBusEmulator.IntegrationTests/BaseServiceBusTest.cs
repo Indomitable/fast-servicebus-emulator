@@ -37,4 +37,18 @@ public class BaseServiceBusTest
     protected const string FilterCatchAllSub = "catch-all-sub"; // no filter (catch-all)
     protected const string FilterMultiTopic = "multi-filter-topic";
     protected const string FilterRegionSubMulti = "region-multi-filters-sub"; // has multiple filters.
+
+
+    protected async Task WaitUntil(Func<bool> condition, TimeSpan maxWaitTime)
+    {
+        var token = new CancellationTokenSource(maxWaitTime).Token;
+        while (!token.IsCancellationRequested)
+        {
+            if (condition())
+            {
+                return;
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(50), token);
+        }
+    }
 }

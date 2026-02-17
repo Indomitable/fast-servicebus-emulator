@@ -16,10 +16,10 @@ namespace AzureServiceBusEmulator.IntegrationTests
             await using var client = new ServiceBusClient(ConnectionString, options);
 
             // Create sender
-            var sender = client.CreateSender(QueueName);
+            await using var sender = client.CreateSender(QueueName);
 
             // Create receiver FIRST
-            var receiver = client.CreateReceiver(QueueName, new ServiceBusReceiverOptions 
+            await using var receiver = client.CreateReceiver(QueueName, new ServiceBusReceiverOptions 
             { 
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
             });
@@ -50,14 +50,14 @@ namespace AzureServiceBusEmulator.IntegrationTests
 
             await using var client = new ServiceBusClient(ConnectionString, options);
             // Create sender for the topic
-            var sender = client.CreateSender(TopicName);
+            await using var sender = client.CreateSender(TopicName);
 
             // Create receivers for both subscriptions
-            var receiver1 = client.CreateReceiver(TopicName, Subscription1, new ServiceBusReceiverOptions 
+            await using var receiver1 = client.CreateReceiver(TopicName, Subscription1, new ServiceBusReceiverOptions 
             { 
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
             });
-            var receiver2 = client.CreateReceiver(TopicName, Subscription2, new ServiceBusReceiverOptions 
+            await using var receiver2 = client.CreateReceiver(TopicName, Subscription2, new ServiceBusReceiverOptions 
             { 
                 ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
             });

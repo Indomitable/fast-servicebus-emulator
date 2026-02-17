@@ -18,14 +18,14 @@ public class SingleReceiverTests: BaseServiceBusTest
 
         await using var client = new ServiceBusClient(ConnectionString, options);
         // Create sender for the topic
-        var sender = client.CreateSender(competingTopic);
+        await using var sender = client.CreateSender(competingTopic);
 
         // Create two receivers for the SAME subscription (competing consumers)
-        var receiver1 = client.CreateReceiver(competingTopic, sharedSub, new ServiceBusReceiverOptions 
+        await using var receiver1 = client.CreateReceiver(competingTopic, sharedSub, new ServiceBusReceiverOptions 
         { 
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
         });
-        var receiver2 = client.CreateReceiver(competingTopic, sharedSub, new ServiceBusReceiverOptions 
+        await using var receiver2 = client.CreateReceiver(competingTopic, sharedSub, new ServiceBusReceiverOptions 
         { 
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
         });
@@ -68,14 +68,14 @@ public class SingleReceiverTests: BaseServiceBusTest
         const string competingQueue = "processing-queue";
 
         // Create sender
-        var sender = client.CreateSender(competingQueue);
+        await using var sender = client.CreateSender(competingQueue);
 
-        var receiver1 = client.CreateReceiver(competingQueue, new ServiceBusReceiverOptions 
+        await using var receiver1 = client.CreateReceiver(competingQueue, new ServiceBusReceiverOptions 
         { 
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
         });
         
-        var receiver2 = client.CreateReceiver(competingQueue, new ServiceBusReceiverOptions 
+        await using var receiver2 = client.CreateReceiver(competingQueue, new ServiceBusReceiverOptions 
         { 
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete 
         });
