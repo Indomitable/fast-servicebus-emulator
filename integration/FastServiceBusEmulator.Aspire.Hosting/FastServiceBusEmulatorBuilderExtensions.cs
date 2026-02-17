@@ -29,7 +29,11 @@ public static class FastServiceBusEmulatorBuilderExtensions
             .WithEndpoint(
                 targetPort: FastServiceBusEmulatorResource.AmqpPort,
                 name: FastServiceBusEmulatorResource.AmqpEndpointName,
-                scheme: "tcp");
+                scheme: "tcp")
+            .WithEndpoint(
+                targetPort: FastServiceBusEmulatorResource.AdminPort,
+                name: FastServiceBusEmulatorResource.AdminEndpointName,
+                scheme: "http");
 
         return new FastServiceBusEmulatorResourceBuilder(resourceBuilder);
     }
@@ -43,6 +47,9 @@ public class FastServiceBusEmulatorResourceBuilder(IResourceBuilder<FastServiceB
 
     public IDistributedApplicationBuilder ApplicationBuilder => builder.ApplicationBuilder;
     public FastServiceBusEmulatorResource Resource => builder.Resource;
+
+    public IResourceBuilder<IResourceWithConnectionString> ConnectionString => this;
+    public IResourceBuilder<IResourceWithServiceDiscovery> ServiceDiscovery => this;
 
     public FastServiceBusEmulatorResourceBuilder WithTopology(Topology topology)
     {

@@ -84,7 +84,7 @@ Transform the emulator from a simple ReceiveAndDelete pass-through into a produc
 | Message sessions | `SessionId`, session lock, session state, session-aware receivers | TODO |
 | Auto-forwarding | Forward messages from one entity to another | TODO |
 | Duplicate detection | `MessageId`-based deduplication within configurable window | TODO |
-| Testing & Management API | REST API (Axum) to reset/inspect queues, topics, subscriptions for integration tests. Endpoints: DELETE/GET `/testing/messages/...` | IN PROGRESS |
+| Testing & Management API | REST API (Axum) to reset/inspect queues, topics, subscriptions for integration tests. Endpoints: DELETE/GET `/testing/messages/...`. Includes .NET Aspire `TestingClient`. | DONE |
 
 ## P3 — Polish
 

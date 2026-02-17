@@ -56,6 +56,7 @@ var serviceBus = builder.AddFastServiceBusEmulator("servicebus")
     });
 
 builder.AddProject<FastServiceBusEmulatorTestProject>("test-project")
-    .WithReference(serviceBus);
+    .WithReference(serviceBus.ConnectionString)
+    .WithReference(serviceBus.ServiceDiscovery);
 
 builder.Build().Run();
