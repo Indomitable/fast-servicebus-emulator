@@ -24,7 +24,7 @@ public class AdminApiTests : BaseServiceBusTest
         request.Headers.Add("X-MESSAGE-SUBJECT", "order-created");
         request.Headers.Add("X-MESSAGE-MESSAGE-ID", "msg-1");
         request.Headers.Add("X-MESSAGE-CORRELATION-ID", "corr-1");
-        request.Headers.Add("X-MESSAGE-PROPERTY-region", "us-east");
+        request.Headers.Add("X-MESSAGE-PROPERTY", "Region=us-east");
 
         var postResp = await AdminHttpClient.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.True(postResp.IsSuccessStatusCode);
@@ -40,7 +40,7 @@ public class AdminApiTests : BaseServiceBusTest
         Assert.Equal("msg-1", msg.MessageId);
         Assert.Equal("corr-1", msg.CorrelationId);
         Assert.Equal("order-created", msg.Subject);
-        Assert.Equal("us-east", msg.ApplicationProperties["region"]?.ToString());
+        Assert.Equal("us-east", msg.ApplicationProperties["Region"]?.ToString());
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class AdminApiTests : BaseServiceBusTest
         {
             Content = new StringContent("topic-rest-message")
         };
-        request.Headers.Add("X-MESSAGE-PROPERTY-region", "eu-west");
+        request.Headers.Add("X-MESSAGE-PROPERTY", "region=eu-west");
 
         var postResp = await AdminHttpClient.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.True(postResp.IsSuccessStatusCode);

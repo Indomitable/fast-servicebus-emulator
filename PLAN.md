@@ -84,7 +84,7 @@ Transform the emulator from a simple ReceiveAndDelete pass-through into a produc
 | Message sessions | `SessionId`, session lock, session state, session-aware receivers | TODO |
 | Auto-forwarding | Forward messages from one entity to another | TODO |
 | Duplicate detection | `MessageId`-based deduplication within configurable window | TODO |
-| Testing & Management API | REST API (Axum) to reset/inspect queues, topics, subscriptions and inject messages for integration tests. Endpoints: GET/DELETE `/testing/messages/...` plus POST for queues/topics. Header mapping supports AMQP properties + `X-MESSAGE-PROPERTY-*` application properties; absolute expiry accepts epoch millis and RFC3339. Includes .NET Aspire `TestingClient`. | DONE |
+| Testing & Management API | REST API (Axum) to reset/inspect queues, topics, subscriptions and inject messages for integration tests. Endpoints: GET/DELETE `/testing/messages/...` plus POST for queues/topics. Header mapping supports AMQP properties + repeatable `X-MESSAGE-PROPERTY: key=value` application properties (case-preserving keys); absolute expiry accepts epoch millis and RFC3339. Includes .NET Aspire `TestingClient`. | DONE |
 
 ## P3 — Polish
 

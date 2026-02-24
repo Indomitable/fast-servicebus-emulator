@@ -72,14 +72,14 @@ Supported message-property headers:
 - `X-MESSAGE-REPLY-TO-GROUP-ID`
 - `X-MESSAGE-ABSOLUTE-EXPIRY-TIME` (epoch millis or RFC3339)
 
-Application properties can be added with prefix headers:
-- `X-MESSAGE-PROPERTY-<name>: <value>`
+Application properties can be added with repeatable headers (preserves key casing):
+- `X-MESSAGE-PROPERTY: <name>=<value>`
 
 Example:
 ```bash
 curl -X POST "http://localhost:45672/testing/messages/topics/filter-appprop-topic" \
   -H "X-MESSAGE-SUBJECT: order-created" \
-  -H "X-MESSAGE-PROPERTY-region: us-east" \
+  -H "X-MESSAGE-PROPERTY: Region=us-east" \
   -H "X-MESSAGE-ABSOLUTE-EXPIRY-TIME: 2026-12-31T23:59:59Z" \
   --data "hello from admin api"
 ```

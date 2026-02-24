@@ -14,8 +14,6 @@ use tracing::info;
 
 use crate::router::{PublishResult, RouterMessage, SharedRouter};
 
-const APP_PROP_HEADER_PREFIX: &str = "x-message-property-";
-
 #[derive(Clone)]
 struct AppState {
     router: SharedRouter,
@@ -304,19 +302,12 @@ fn build_message(headers: &HeaderMap, body: Bytes) -> Result<RouterMessage, Stri
     }
 
     let mut app_props = ApplicationProperties::default();
-    for (name, value) in headers {
-        if let Some(name) = name.as_str().strip_prefix(APP_PROP_HEADER_PREFIX) {
-            if name.is_empty() {
-                continue;
-            }
-
-            let value = value
-                .to_str()
-                .map_err(|_| format!("invalid header value for {}", name))?;
-            app_props
-                .0
-                .insert(name.to_string(), SimpleValue::String(value.to_string()));
-        }
+    for value in headers.get_all("x-message-property") {
+        let raw = value
+            .to_str()
+            .map_err(|_| "invalid header value for X-MESSAGE-PROPERTY".to_string())?;
+        let (key, val) = parse_app_property(raw)?;
+        app_props.0.insert(key, SimpleValue::String(val));
     }
     if !app_props.0.is_empty() {
         message.application_properties = Some(app_props);
@@ -337,4 +328,17 @@ fn parse_expiry_timestamp(value: &str) -> Result<Timestamp, String> {
     let parsed = DateTime::parse_from_rfc3339(value)
         .map_err(|_| "X-MESSAGE-ABSOLUTE-EXPIRY-TIME must be epoch millis or RFC3339".to_string())?;
     Ok(Timestamp::from_milliseconds(parsed.timestamp_millis()))
+}
+
+fn parse_app_property(raw: &str) -> Result<(String, String), String> {
+    let (key, value) = raw
+        .split_once('=')
+        .ok_or_else(|| "X-MESSAGE-PROPERTY must be in the form key=value".to_string())?;
+
+    let key = key.trim();
+    if key.is_empty() {
+        return Err("X-MESSAGE-PROPERTY key cannot be empty".to_string());
+    }
+
+    Ok((key.to_string(), value.trim().to_string()))
 }

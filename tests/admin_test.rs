@@ -64,8 +64,8 @@ async fn test_admin_api_post_queue_with_properties() {
     headers.insert("X-MESSAGE-SUBJECT", "order-created".parse().unwrap());
     headers.insert("X-MESSAGE-MESSAGE-ID", "msg-123".parse().unwrap());
     headers.insert("X-MESSAGE-CORRELATION-ID", "corr-456".parse().unwrap());
-    headers.insert("X-MESSAGE-PROPERTY-region", "us-east".parse().unwrap());
-    headers.insert("X-MESSAGE-PROPERTY-tenant", "contoso".parse().unwrap());
+    headers.append("X-MESSAGE-PROPERTY", "Region=us-east".parse().unwrap());
+    headers.append("X-MESSAGE-PROPERTY", "tenant=contoso".parse().unwrap());
 
     let resp = client
         .post(format!("{}/testing/messages/queues/input-queue", base_url))
@@ -85,7 +85,7 @@ async fn test_admin_api_post_queue_with_properties() {
     assert_eq!(props.subject.as_deref(), Some("order-created"));
 
     let app_props = message.application_properties.as_ref().unwrap();
-    assert_eq!(app_props.0.get("region").map(|v| format!("{:?}", v)).unwrap(), "String(\"us-east\")");
+    assert_eq!(app_props.0.get("Region").map(|v| format!("{:?}", v)).unwrap(), "String(\"us-east\")");
     assert_eq!(app_props.0.get("tenant").map(|v| format!("{:?}", v)).unwrap(), "String(\"contoso\")");
 
     server_handle.abort();
@@ -97,7 +97,7 @@ async fn test_admin_api_post_topic_honors_filters() {
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
-    headers.insert("X-MESSAGE-PROPERTY-region", "eu-west".parse().unwrap());
+    headers.append("X-MESSAGE-PROPERTY", "region=eu-west".parse().unwrap());
 
     let resp = client
         .post(format!("{}/testing/messages/topics/filter-appprop-topic", base_url))
