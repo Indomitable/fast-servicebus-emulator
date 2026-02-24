@@ -6,51 +6,123 @@ namespace AzureServiceBusEmulator.IntegrationTests;
 
 public class AdminApiTests : BaseServiceBusTest
 {
+    private async Task ResetStateAsync()
+    {
+        var response = await AdminHttpClient.DeleteAsync("/testing/messages");
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task PostQueueMessage_SendsMessageWithHeaders()
+    {
+        await ResetStateAsync();
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/testing/messages/queues/{QueueName}")
+        {
+            Content = new StringContent("hello-from-rest")
+        };
+        request.Headers.Add("X-MESSAGE-SUBJECT", "order-created");
+        request.Headers.Add("X-MESSAGE-MESSAGE-ID", "msg-1");
+        request.Headers.Add("X-MESSAGE-CORRELATION-ID", "corr-1");
+        request.Headers.Add("X-MESSAGE-PROPERTY-region", "us-east");
+
+        var postResp = await AdminHttpClient.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.True(postResp.IsSuccessStatusCode);
+
+        await using var client = new ServiceBusClient(ConnectionString);
+        var receiver = client.CreateReceiver(QueueName, new ServiceBusReceiverOptions
+        {
+            ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
+        });
+
+        var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.NotNull(msg);
+        Assert.Equal("msg-1", msg.MessageId);
+        Assert.Equal("corr-1", msg.CorrelationId);
+        Assert.Equal("order-created", msg.Subject);
+        Assert.Equal("us-east", msg.ApplicationProperties["region"]?.ToString());
+    }
+
+    [Fact]
+    public async Task PostTopicMessage_WithFilterProperty_RoutesToMatchingSubscriptions()
+    {
+        await ResetStateAsync();
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/testing/messages/topics/{FilterAppPropTopic}")
+        {
+            Content = new StringContent("topic-rest-message")
+        };
+        request.Headers.Add("X-MESSAGE-PROPERTY-region", "eu-west");
+
+        var postResp = await AdminHttpClient.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.True(postResp.IsSuccessStatusCode);
+
+        await using var client = new ServiceBusClient(ConnectionString);
+        var regionReceiver = client.CreateReceiver(FilterAppPropTopic, FilterRegionSub, new ServiceBusReceiverOptions
+        {
+            ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
+        });
+        var catchAllReceiver = client.CreateReceiver(FilterAppPropTopic, FilterCatchAllSub, new ServiceBusReceiverOptions
+        {
+            ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
+        });
+
+        var regionMsg = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        var catchAllMsg = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Null(regionMsg);
+        Assert.NotNull(catchAllMsg);
+    }
+
     [Fact]
     public async Task ClearQueue_DeletesMessages_And_Get_ReturnsEmpty()
     {
+        await ResetStateAsync();
+
         await using var client = new ServiceBusClient(ConnectionString);
         var sender = client.CreateSender(QueueName);
 
         // Send 2 messages
-        await sender.SendMessageAsync(new ServiceBusMessage("msg1"));
-        await sender.SendMessageAsync(new ServiceBusMessage("msg2"));
+        await sender.SendMessageAsync(new ServiceBusMessage("msg1"), TestContext.Current.CancellationToken);
+        await sender.SendMessageAsync(new ServiceBusMessage("msg2"), TestContext.Current.CancellationToken);
 
         // Verify GET returns 2 messages
-        var getResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>($"/testing/messages/queues/{QueueName}");
+        var getResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>($"/testing/messages/queues/{QueueName}", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(getResp);
         Assert.Equal(2, getResp.Count);
 
         // Delete messages
-        var delResp = await AdminHttpClient.DeleteAsync($"/testing/messages/queues/{QueueName}");
+        var delResp = await AdminHttpClient.DeleteAsync($"/testing/messages/queues/{QueueName}", TestContext.Current.CancellationToken);
         Assert.True(delResp.IsSuccessStatusCode);
 
         // Verify GET returns 0 messages
-        getResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>($"/testing/messages/queues/{QueueName}");
+        getResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>($"/testing/messages/queues/{QueueName}", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(getResp);
         Assert.Empty(getResp);
 
         // Verify Receive returns nothing
         var receiver = client.CreateReceiver(QueueName, new ServiceBusReceiverOptions { ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete });
-        var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1));
+        var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         Assert.Null(msg);
     }
 
     [Fact]
     public async Task GetTopicMessages_ReturnsUnionOfSubscriptions()
     {
+        await ResetStateAsync();
+
         await using var client = new ServiceBusClient(ConnectionString);
         var sender = client.CreateSender(TopicName); // events-topic has sub-1 and sub-2
 
         // Send 1 message to topic -> Fanout to sub-1 (1 msg) and sub-2 (1 msg) => Total 2
-        await sender.SendMessageAsync(new ServiceBusMessage("topic-msg-1"));
+        await sender.SendMessageAsync(new ServiceBusMessage("topic-msg-1"), TestContext.Current.CancellationToken);
 
         // Verify state:
         // sub-1: 1 message
         // sub-2: 1 message
         // Total in topic: 2 messages (Union of all subscriptions)
 
-        var getResp = await AdminHttpClient.GetFromJsonAsync<List<AdminTopicMessageResponse>>($"/testing/messages/topics/{TopicName}");
+        var getResp = await AdminHttpClient.GetFromJsonAsync<List<AdminTopicMessageResponse>>($"/testing/messages/topics/{TopicName}", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(getResp);
         
         // This proves we return the union (2) rather than distinct messages (1)
@@ -66,6 +138,8 @@ public class AdminApiTests : BaseServiceBusTest
     [Fact]
     public async Task GetSubscriptionMessages_RespectsFilters()
     {
+        await ResetStateAsync();
+
         await using var client = new ServiceBusClient(ConnectionString);
         var sender = client.CreateSender(FilterAppPropTopic); 
         // FilterAppPropTopic has:
@@ -77,19 +151,17 @@ public class AdminApiTests : BaseServiceBusTest
         // Msg B: region=eu-west (Should match only catch-all)
         var msgB = new ServiceBusMessage("msg-b") { ApplicationProperties = { ["region"] = "eu-west" } };
 
-        await sender.SendMessageAsync(msgA);
-        await sender.SendMessageAsync(msgB);
+        await sender.SendMessageAsync(msgA, TestContext.Current.CancellationToken);
+        await sender.SendMessageAsync(msgB, TestContext.Current.CancellationToken);
 
         // Verify Region Sub (Expect 1: msgA)
-        var regionResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>(
-            $"/testing/messages/topics/{FilterAppPropTopic}/subscriptions/{FilterRegionSub}");
+        var regionResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>($"/testing/messages/topics/{FilterAppPropTopic}/subscriptions/{FilterRegionSub}", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(regionResp);
         Assert.Single(regionResp);
         // Note: checking content inside "message_debug" is brittle, but we know count is 1.
 
         // Verify Catch All Sub (Expect 2: msgA + msgB)
-        var catchAllResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>(
-            $"/testing/messages/topics/{FilterAppPropTopic}/subscriptions/{FilterCatchAllSub}");
+        var catchAllResp = await AdminHttpClient.GetFromJsonAsync<List<AdminMessageResponse>>($"/testing/messages/topics/{FilterAppPropTopic}/subscriptions/{FilterCatchAllSub}", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(catchAllResp);
         Assert.Equal(2, catchAllResp.Count);
     }

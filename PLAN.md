@@ -8,7 +8,7 @@ High-performance, lightweight Azure Service Bus emulator in Rust implementing AM
 - **Topology**: Static config via YAML (`CONFIG_PATH` env var, defaults to `config.yaml` / `/config/topology.yaml` in Docker)
 - **Auth**: Mock SASL + mock CBS (accepts any token, returns 200 OK)
 - **Delivery**: Competing consumers — each message to exactly one receiver per queue/subscription. Topics fan out to all subscriptions.
-- **No Management API**: Static topology only
+- **Testing Management API**: Axum HTTP admin endpoints on port 45672 for test reset/inspection/message injection
 - **Persistence**: In-memory only
 - **Case-insensitive** subscription path matching (`Subscriptions` vs `subscriptions`)
 - **fe2o3-amqp**: Consumed as git submodule (`vendor/fe2o3-amqp/`, branch `patch/pipelined-flow-credit`)
@@ -84,7 +84,7 @@ Transform the emulator from a simple ReceiveAndDelete pass-through into a produc
 | Message sessions | `SessionId`, session lock, session state, session-aware receivers | TODO |
 | Auto-forwarding | Forward messages from one entity to another | TODO |
 | Duplicate detection | `MessageId`-based deduplication within configurable window | TODO |
-| Testing & Management API | REST API (Axum) to reset/inspect queues, topics, subscriptions for integration tests. Endpoints: DELETE/GET `/testing/messages/...`. Includes .NET Aspire `TestingClient`. | DONE |
+| Testing & Management API | REST API (Axum) to reset/inspect queues, topics, subscriptions and inject messages for integration tests. Endpoints: GET/DELETE `/testing/messages/...` plus POST for queues/topics. Header mapping supports AMQP properties + `X-MESSAGE-PROPERTY-*` application properties; absolute expiry accepts epoch millis and RFC3339. Includes .NET Aspire `TestingClient`. | DONE |
 
 ## P3 — Polish
 

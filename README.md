@@ -15,6 +15,7 @@ It implements the AMQP 1.0 protocol and mocks the Azure Service Bus behavior req
 - **Subscription filters**: Correlation filters (system properties + application properties). SQL filters are parsed but not evaluated (warning, match-all).
 - **Compatibility workarounds**: Patches common Azure SDK quirks (e.g. missing `initial-delivery-count`, lock-token in delivery tag, always serialize header `delivery_count`).
 - **Operational**: Ctrl+C / SIGTERM stops accepting new connections.
+- **Testing Admin API**: HTTP API on port `45672` for resetting, inspecting, and injecting messages during tests.
 
 ## Configuration
 Edit `config.yaml` to define queues, topics and other configurations:
@@ -35,6 +36,52 @@ topology:
 Run the emulator:
 ```bash
 cargo run
+```
+
+AMQP listens on `5672` and the testing admin API listens on `45672`.
+
+## Testing Admin API
+
+Base URL: `http://localhost:45672`
+
+### Inspect and reset messages
+- `GET /testing/messages`
+- `DELETE /testing/messages`
+- `GET /testing/messages/queues/:queue`
+- `DELETE /testing/messages/queues/:queue`
+- `GET /testing/messages/topics/:topic`
+- `DELETE /testing/messages/topics/:topic`
+- `GET /testing/messages/topics/:topic/subscriptions/:subscription`
+- `DELETE /testing/messages/topics/:topic/subscriptions/:subscription`
+
+### Inject messages via REST
+- `POST /testing/messages/queues/:queue`
+- `POST /testing/messages/topics/:topic`
+
+Request body is the message payload.
+
+Supported message-property headers:
+- `X-MESSAGE-SUBJECT`
+- `X-MESSAGE-MESSAGE-ID`
+- `X-MESSAGE-USER-ID`
+- `X-MESSAGE-TO`
+- `X-MESSAGE-REPLY-TO`
+- `X-MESSAGE-CORRELATION-ID`
+- `X-MESSAGE-CONTENT-TYPE`
+- `X-MESSAGE-GROUP-ID`
+- `X-MESSAGE-REPLY-TO-GROUP-ID`
+- `X-MESSAGE-ABSOLUTE-EXPIRY-TIME` (epoch millis or RFC3339)
+
+Application properties can be added with prefix headers:
+- `X-MESSAGE-PROPERTY-<name>: <value>`
+
+Example:
+```bash
+curl -X POST "http://localhost:45672/testing/messages/topics/filter-appprop-topic" \
+  -H "X-MESSAGE-SUBJECT: order-created" \
+  -H "X-MESSAGE-PROPERTY-region: us-east" \
+  -H "X-MESSAGE-ABSOLUTE-EXPIRY-TIME: 2026-12-31T23:59:59Z" \
+  --data "hello from admin api"
 ```
 
 ## Integration Testing

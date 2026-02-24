@@ -64,3 +64,19 @@ builder.AddProject<FastServiceBusEmulatorTestProject>("test-project")
 builder.Build().Run();
 
 ```
+
+## Endpoints
+
+- AMQP endpoint: `serviceBus.Resource.AmqpEndpoint`
+- Admin HTTP endpoint: `serviceBus.Resource.AdminEndpoint` (default container port `45672`)
+
+## TestingClient
+
+Use `TestingClient` with the admin endpoint to reset, inspect, and inject messages in tests.
+
+Available methods include:
+- `DeleteAllMessagesAsync`
+- `GetAllMessagesAsync`
+- `DeleteQueueMessagesAsync` / `GetQueueMessagesAsync` / `PostQueueMessageAsync`
+- `DeleteTopicMessagesAsync` / `GetTopicMessagesAsync` / `PostTopicMessageAsync`
+- `DeleteSubscriptionMessagesAsync` / `GetSubscriptionMessagesAsync`

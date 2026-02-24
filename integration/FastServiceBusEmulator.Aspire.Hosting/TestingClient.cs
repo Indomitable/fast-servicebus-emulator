@@ -9,6 +9,34 @@ namespace FastServiceBusEmulator.Aspire.Hosting;
 public class TestingClient(HttpClient httpClient)
 {
     /// <summary>
+    /// Sends a message to a queue through the testing REST API.
+    /// </summary>
+    public async Task PostQueueMessageAsync(
+        string queueName,
+        string body,
+        IDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = BuildPostRequest($"/testing/messages/queues/{queueName}", body, headers);
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Sends a message to a topic through the testing REST API.
+    /// </summary>
+    public async Task PostTopicMessageAsync(
+        string topicName,
+        string body,
+        IDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = BuildPostRequest($"/testing/messages/topics/{topicName}", body, headers);
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
     /// Deletes all messages from all queues and subscriptions.
     /// </summary>
     public async Task DeleteAllMessagesAsync(CancellationToken cancellationToken = default)
@@ -74,6 +102,24 @@ public class TestingClient(HttpClient httpClient)
     public async Task<List<MessageResponse>> GetSubscriptionMessagesAsync(string topicName, string subscriptionName, CancellationToken cancellationToken = default)
     {
         return await httpClient.GetFromJsonAsync<List<MessageResponse>>($"/testing/messages/topics/{topicName}/subscriptions/{subscriptionName}", cancellationToken) ?? [];
+    }
+
+    private static HttpRequestMessage BuildPostRequest(string path, string body, IDictionary<string, string>? headers)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = new StringContent(body)
+        };
+
+        if (headers is not null)
+        {
+            foreach (var header in headers)
+            {
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
+        return request;
     }
 }
 
