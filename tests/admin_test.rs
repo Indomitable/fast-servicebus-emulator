@@ -66,6 +66,10 @@ async fn test_admin_api_post_queue_with_properties() {
     headers.insert("X-MESSAGE-CORRELATION-ID", "corr-456".parse().unwrap());
     headers.append("X-MESSAGE-PROPERTY", "Region=us-east".parse().unwrap());
     headers.append("X-MESSAGE-PROPERTY", "tenant=contoso".parse().unwrap());
+    headers.append(
+        "X-MESSAGE-PROPERTY",
+        "environment=dev, role=backend".parse().unwrap(),
+    );
 
     let resp = client
         .post(format!("{}/testing/messages/queues/input-queue", base_url))
@@ -87,6 +91,8 @@ async fn test_admin_api_post_queue_with_properties() {
     let app_props = message.application_properties.as_ref().unwrap();
     assert_eq!(app_props.0.get("Region").map(|v| format!("{:?}", v)).unwrap(), "String(\"us-east\")");
     assert_eq!(app_props.0.get("tenant").map(|v| format!("{:?}", v)).unwrap(), "String(\"contoso\")");
+    assert_eq!(app_props.0.get("environment").map(|v| format!("{:?}", v)).unwrap(), "String(\"dev\")");
+    assert_eq!(app_props.0.get("role").map(|v| format!("{:?}", v)).unwrap(), "String(\"backend\")");
 
     server_handle.abort();
 }
@@ -119,6 +125,52 @@ async fn test_admin_api_post_topic_honors_filters() {
         .get_subscription_store("filter-appprop-topic", "catch-all-sub")
         .unwrap();
     assert_eq!(catch_all.total_count().await, 1);
+
+    server_handle.abort();
+}
+
+#[tokio::test]
+async fn test_admin_api_post_queue_property_splitting_with_quoted_commas() {
+    let (base_url, server_handle, router) = start_admin_server().await;
+    let client = reqwest::Client::new();
+
+    let mut headers = HeaderMap::new();
+    headers.append(
+        "X-MESSAGE-PROPERTY",
+        "payload=\"a,b=c\", plain=ok".parse().unwrap(),
+    );
+    headers.append(
+        "X-MESSAGE-PROPERTY",
+        "extra=\"x,y,z\"".parse().unwrap(),
+    );
+
+    let resp = client
+        .post(format!("{}/testing/messages/queues/input-queue", base_url))
+        .headers(headers)
+        .body("hello with quoted properties")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let store = router.get_queue_store("input-queue").unwrap();
+    let snapshot = store.snapshot().await;
+    assert_eq!(snapshot.len(), 1);
+
+    let message = &snapshot[0].message;
+    let app_props = message.application_properties.as_ref().unwrap();
+    assert_eq!(
+        app_props.0.get("payload").map(|v| format!("{:?}", v)).unwrap(),
+        "String(\"a,b=c\")"
+    );
+    assert_eq!(
+        app_props.0.get("plain").map(|v| format!("{:?}", v)).unwrap(),
+        "String(\"ok\")"
+    );
+    assert_eq!(
+        app_props.0.get("extra").map(|v| format!("{:?}", v)).unwrap(),
+        "String(\"x,y,z\")"
+    );
 
     server_handle.abort();
 }

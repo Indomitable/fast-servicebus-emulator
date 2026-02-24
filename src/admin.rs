@@ -306,8 +306,9 @@ fn build_message(headers: &HeaderMap, body: Bytes) -> Result<RouterMessage, Stri
         let raw = value
             .to_str()
             .map_err(|_| "invalid header value for X-MESSAGE-PROPERTY".to_string())?;
-        let (key, val) = parse_app_property(raw)?;
-        app_props.0.insert(key, SimpleValue::String(val));
+        for (key, val) in parse_app_properties(raw)? {
+            app_props.0.insert(key, SimpleValue::String(val));
+        }
     }
     if !app_props.0.is_empty() {
         message.application_properties = Some(app_props);
@@ -330,15 +331,42 @@ fn parse_expiry_timestamp(value: &str) -> Result<Timestamp, String> {
     Ok(Timestamp::from_milliseconds(parsed.timestamp_millis()))
 }
 
-fn parse_app_property(raw: &str) -> Result<(String, String), String> {
-    let (key, value) = raw
-        .split_once('=')
-        .ok_or_else(|| "X-MESSAGE-PROPERTY must be in the form key=value".to_string())?;
+fn parse_app_properties(raw: &str) -> Result<Vec<(String, String)>, String> {
+    let mut props = Vec::new();
+    for pair in split_ignoring_quotes(raw, ',') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
 
-    let key = key.trim();
-    if key.is_empty() {
-        return Err("X-MESSAGE-PROPERTY key cannot be empty".to_string());
+        let (key, value) = pair
+            .split_once('=')
+            .ok_or_else(|| "X-MESSAGE-PROPERTY must be in the form key=value".to_string())?;
+
+        let key = key.trim();
+        if key.is_empty() {
+            return Err("X-MESSAGE-PROPERTY key cannot be empty".to_string());
+        }
+
+        let value = value.trim().trim_matches('"').to_string();
+        props.push((key.to_string(), value));
     }
 
-    Ok((key.to_string(), value.trim().to_string()))
+    Ok(props)
+}
+
+fn split_ignoring_quotes(input: &str, separator: char) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    let mut in_quotes = false;
+    for (idx, ch) in input.char_indices() {
+        if ch == '"' {
+            in_quotes = !in_quotes;
+        } else if ch == separator && !in_quotes {
+            out.push(&input[start..idx]);
+            start = idx + ch.len_utf8();
+        }
+    }
+    out.push(&input[start..]);
+    out
 }
