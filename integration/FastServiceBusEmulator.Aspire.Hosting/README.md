@@ -80,3 +80,4 @@ Available methods include:
 - `DeleteQueueMessagesAsync` / `GetQueueMessagesAsync` / `PostQueueMessageAsync`
 - `DeleteTopicMessagesAsync` / `GetTopicMessagesAsync` / `PostTopicMessageAsync`
 - `DeleteSubscriptionMessagesAsync` / `GetSubscriptionMessagesAsync`
+- `PostQueueMessageAsync` and `PostTopicMessageAsync`
