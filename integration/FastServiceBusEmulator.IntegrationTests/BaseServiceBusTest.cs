@@ -1,10 +1,10 @@
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 [CollectionDefinition(nameof(ServiceBusCollection))]
-public class ServiceBusCollection;
+public class ServiceBusCollection : ICollectionFixture<AspireFactory>;
 
 [Collection(nameof(ServiceBusCollection))]
-public class BaseServiceBusTest //: IAsyncLifetime
+public class BaseServiceBusTest
 {
     protected const string ConnectionString = "Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
 

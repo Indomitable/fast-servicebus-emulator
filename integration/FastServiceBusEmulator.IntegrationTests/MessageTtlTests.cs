@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 /// <summary>
 /// Tests for message time-to-live (TTL) functionality:
@@ -30,17 +30,17 @@ public class MessageTtlTests : BaseServiceBusTest
         {
             TimeToLive = TimeSpan.FromSeconds(1)
         };
-        await sender.SendMessageAsync(message);
+        await sender.SendMessageAsync(message, TestContext.Current.CancellationToken);
 
         // Wait for expiry
-        await Task.Delay(TimeSpan.FromSeconds(3));
+        await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
         // Try to receive — should return null (expired and discarded)
         await using var receiver = client.CreateReceiver(TtlDiscardQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
-        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(received);
     }
 
@@ -62,17 +62,17 @@ public class MessageTtlTests : BaseServiceBusTest
 
         // Send a message (no per-message TTL — uses entity default of 2 seconds)
         var messageBody = $"ttl-dlq-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // Wait for expiry (entity default is 2s, wait 4s to be safe)
-        await Task.Delay(TimeSpan.FromSeconds(4));
+        await Task.Delay(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken);
 
         // Main queue should be empty — message expired
         await using var receiver = client.CreateReceiver(TtlDlqQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
-        var mainMsg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var mainMsg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(mainMsg);
 
         // DLQ should have the message
@@ -81,7 +81,7 @@ public class MessageTtlTests : BaseServiceBusTest
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete,
             SubQueue = SubQueue.DeadLetter
         });
-        var dlqMsg = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var dlqMsg = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(dlqMsg);
         Assert.Equal(messageBody, dlqMsg.Body.ToString());
     }

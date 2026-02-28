@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 /// <summary>
 /// Tests that the emulator correctly respects AMQP link credit flow control,
@@ -39,7 +39,7 @@ public class LinkCreditTests : BaseServiceBusTest
         {
             var body = $"on-demand-{i}-{Guid.NewGuid()}";
             sentBodies.Add(body);
-            await sender.SendMessageAsync(new ServiceBusMessage(body));
+            await sender.SendMessageAsync(new ServiceBusMessage(body), TestContext.Current.CancellationToken);
         }
 
         // Create receiver with default PrefetchCount (0 = on-demand credit)
@@ -53,7 +53,7 @@ public class LinkCreditTests : BaseServiceBusTest
         var receivedBodies = new List<string>();
         for (int i = 0; i < messageCount; i++)
         {
-            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.NotNull(msg);
             receivedBodies.Add(msg.Body.ToString());
         }
@@ -92,7 +92,7 @@ public class LinkCreditTests : BaseServiceBusTest
         {
             var body = $"prefetch5-{i}-{Guid.NewGuid()}";
             sentBodies.Add(body);
-            await sender.SendMessageAsync(new ServiceBusMessage(body));
+            await sender.SendMessageAsync(new ServiceBusMessage(body), TestContext.Current.CancellationToken);
         }
 
         // Create receiver with PrefetchCount = 5
@@ -107,7 +107,7 @@ public class LinkCreditTests : BaseServiceBusTest
         var receivedBodies = new List<string>();
         for (int i = 0; i < messageCount; i++)
         {
-            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.NotNull(msg);
             receivedBodies.Add(msg.Body.ToString());
         }
@@ -145,7 +145,7 @@ public class LinkCreditTests : BaseServiceBusTest
         {
             var body = $"prefetch1-{i}-{Guid.NewGuid()}";
             sentBodies.Add(body);
-            await sender.SendMessageAsync(new ServiceBusMessage(body));
+            await sender.SendMessageAsync(new ServiceBusMessage(body), TestContext.Current.CancellationToken);
         }
 
         // Create receiver with PrefetchCount = 1
@@ -159,7 +159,7 @@ public class LinkCreditTests : BaseServiceBusTest
         var receivedBodies = new List<string>();
         for (int i = 0; i < messageCount; i++)
         {
-            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.NotNull(msg);
             receivedBodies.Add(msg.Body.ToString());
         }
@@ -191,7 +191,7 @@ public class LinkCreditTests : BaseServiceBusTest
         const int messageCount = 3;
         for (int i = 0; i < messageCount; i++)
         {
-            await sender.SendMessageAsync(new ServiceBusMessage($"bounded-{i}-{Guid.NewGuid()}"));
+            await sender.SendMessageAsync(new ServiceBusMessage($"bounded-{i}-{Guid.NewGuid()}"), TestContext.Current.CancellationToken);
         }
 
         await using var receiver = client.CreateReceiver(PrefetchQueue, new ServiceBusReceiverOptions
@@ -203,12 +203,12 @@ public class LinkCreditTests : BaseServiceBusTest
         // Receive the 3 messages
         for (int i = 0; i < messageCount; i++)
         {
-            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.NotNull(msg);
         }
 
         // Next receive should timeout — no more messages
-        var extra = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var extra = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(extra);
     }
 }

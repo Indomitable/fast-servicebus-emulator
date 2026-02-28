@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Azure.Messaging.ServiceBus;
 using Microsoft.AspNetCore.Mvc;
@@ -36,7 +37,7 @@ app.Run();
 
 return;
 
-async IAsyncEnumerable<string> GetMessages(Channel<string> channel, CancellationToken token)
+async IAsyncEnumerable<string> GetMessages(Channel<string> channel, [EnumeratorCancellation] CancellationToken token)
 {
     while (!token.IsCancellationRequested)
     {

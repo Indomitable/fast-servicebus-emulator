@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 /// <summary>
 /// Tests for backpressure when a queue reaches its max_size capacity.
@@ -32,7 +32,7 @@ public class BackpressureTests : BaseServiceBusTest
         });
         while (true)
         {
-            var leftover = await drainReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1));
+            var leftover = await drainReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
             if (leftover == null) break;
         }
         // Close the drain receiver so its AMQP link is detached and no more
@@ -43,13 +43,13 @@ public class BackpressureTests : BaseServiceBusTest
         // Fill the queue to capacity (10 messages)
         for (int i = 0; i < 10; i++)
         {
-            await sender.SendMessageAsync(new ServiceBusMessage($"bp-{i}-{Guid.NewGuid()}"));
+            await sender.SendMessageAsync(new ServiceBusMessage($"bp-{i}-{Guid.NewGuid()}"), TestContext.Current.CancellationToken);
         }
 
         // The 11th message should be rejected
         var ex = await Assert.ThrowsAsync<ServiceBusException>(async () =>
         {
-            await sender.SendMessageAsync(new ServiceBusMessage($"bp-overflow-{Guid.NewGuid()}"));
+            await sender.SendMessageAsync(new ServiceBusMessage($"bp-overflow-{Guid.NewGuid()}"), TestContext.Current.CancellationToken);
         });
 
         // The exception should indicate the queue is full
@@ -78,7 +78,7 @@ public class BackpressureTests : BaseServiceBusTest
         });
         while (true)
         {
-            var leftover = await drainReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1));
+            var leftover = await drainReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
             if (leftover == null) break;
         }
         // Close the drain receiver before filling the queue
@@ -87,7 +87,7 @@ public class BackpressureTests : BaseServiceBusTest
         // Fill to capacity
         for (int i = 0; i < 10; i++)
         {
-            await sender.SendMessageAsync(new ServiceBusMessage($"bp-drain-{i}-{Guid.NewGuid()}"));
+            await sender.SendMessageAsync(new ServiceBusMessage($"bp-drain-{i}-{Guid.NewGuid()}"), TestContext.Current.CancellationToken);
         }
 
         // Drain 5 messages to free space
@@ -97,7 +97,7 @@ public class BackpressureTests : BaseServiceBusTest
         });
         for (int i = 0; i < 5; i++)
         {
-            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+            var msg = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.NotNull(msg);
         }
         // Close the receiver to free credits before sending more
@@ -105,14 +105,14 @@ public class BackpressureTests : BaseServiceBusTest
 
         // Should now be able to send again
         var newBody = $"bp-after-drain-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(newBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(newBody), TestContext.Current.CancellationToken);
 
         // Verify we can receive the new message
         var verifyReceiver = client.CreateReceiver(BackpressureQueue, new ServiceBusReceiverOptions
         {
             ReceiveMode = ServiceBusReceiveMode.ReceiveAndDelete
         });
-        var received = await verifyReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var received = await verifyReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(received);
     }
 }

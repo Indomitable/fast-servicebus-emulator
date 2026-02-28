@@ -59,4 +59,4 @@ builder.AddProject<FastServiceBusEmulatorTestProject>("test-project")
     .WithReference(serviceBus.ConnectionString)
     .WithReference(serviceBus.ServiceDiscovery);
 
-builder.Build().Run();
+await builder.Build().RunAsync();

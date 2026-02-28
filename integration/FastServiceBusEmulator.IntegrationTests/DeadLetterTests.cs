@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 /// <summary>
 /// Tests for dead-letter queue functionality:
@@ -40,22 +40,22 @@ public class DeadLetterTests : BaseServiceBusTest
 
         // Send a message
         var messageBody = $"dlq-explicit-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // Receive in PeekLock
-        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(received);
         Assert.Equal(messageBody, received.Body.ToString());
 
         // Dead-letter it
-        await receiver.DeadLetterMessageAsync(received, "TestReason", "Testing explicit dead-letter");
+        await receiver.DeadLetterMessageAsync(received, "TestReason", "Testing explicit dead-letter", TestContext.Current.CancellationToken);
 
         // Main queue should be empty
-        var mainNext = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var mainNext = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(mainNext);
 
         // DLQ should have the message
-        var dlqMessage = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var dlqMessage = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(dlqMessage);
         Assert.Equal(messageBody, dlqMessage.Body.ToString());
     }
@@ -92,27 +92,27 @@ public class DeadLetterTests : BaseServiceBusTest
 
         // Send a message
         var messageBody = $"dlq-auto-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // First receive + abandon (delivery count → 1)
-        var first = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var first = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(first);
         Assert.Equal(messageBody, first.Body.ToString());
-        await receiver.AbandonMessageAsync(first);
+        await receiver.AbandonMessageAsync(first, cancellationToken: TestContext.Current.CancellationToken);
 
         // Second receive + abandon (delivery count → 2, equals max_delivery_count)
         // On this abandon, the store should auto-dead-letter the message.
-        var second = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var second = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(second);
         Assert.Equal(messageBody, second.Body.ToString());
-        await receiver.AbandonMessageAsync(second);
+        await receiver.AbandonMessageAsync(second, cancellationToken: TestContext.Current.CancellationToken);
 
         // Main queue should be empty now — message was auto-dead-lettered
-        var mainNext = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var mainNext = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(mainNext);
 
         // DLQ should have the message
-        var dlqMessage = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var dlqMessage = await dlqReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(dlqMessage);
         Assert.Equal(messageBody, dlqMessage.Body.ToString());
     }

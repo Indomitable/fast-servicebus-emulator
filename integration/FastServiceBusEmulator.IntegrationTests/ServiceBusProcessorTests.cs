@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 public class ServiceBusProcessorTests: BaseServiceBusTest
 {
@@ -22,21 +22,21 @@ public class ServiceBusProcessorTests: BaseServiceBusTest
 
         processor.ProcessMessageAsync += ReceiveMessage;
         processor.ProcessErrorAsync += ReceiveError;
-        await processor.StartProcessingAsync();
+        await processor.StartProcessingAsync(TestContext.Current.CancellationToken);
 
         var messageBody = "Message 1";
         var message = new ServiceBusMessage(messageBody);
-        await sender.SendMessageAsync(message);
+        await sender.SendMessageAsync(message, TestContext.Current.CancellationToken);
         
         messageBody = "Message 2";
         message = new ServiceBusMessage(messageBody);
-        await sender.SendMessageAsync(message);
+        await sender.SendMessageAsync(message, TestContext.Current.CancellationToken);
 
         await WaitUntil(() => messages.Count == 2, TimeSpan.FromSeconds(10));
         
         Assert.Equal(2, messages.Count);
 
-        await processor.StopProcessingAsync();
+        await processor.StopProcessingAsync(TestContext.Current.CancellationToken);
         
         processor.ProcessMessageAsync -= ReceiveMessage;
         processor.ProcessErrorAsync -= ReceiveError;

@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 public class SingleReceiverTests: BaseServiceBusTest
 {
@@ -31,13 +31,13 @@ public class SingleReceiverTests: BaseServiceBusTest
         });
 
         // Start both receive tasks
-        var receiveTask1 = receiver1.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
-        var receiveTask2 = receiver2.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var receiveTask1 = receiver1.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        var receiveTask2 = receiver2.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
         // Send message to the topic
         var messageBody = $"Topic fanout test - {Guid.NewGuid()}";
         var message = new ServiceBusMessage(messageBody);
-        await sender.SendMessageAsync(message);
+        await sender.SendMessageAsync(message, TestContext.Current.CancellationToken);
 
         // Both subscriptions should receive the message
         var received1 = await receiveTask1;
@@ -81,15 +81,15 @@ public class SingleReceiverTests: BaseServiceBusTest
         });
 
         // Start receiving task
-        var receiveTask1 = receiver1.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
-        var receiveTask2 = receiver2.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var receiveTask1 = receiver1.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        var receiveTask2 = receiver2.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
         // Create message
         string messageBody = $"Hello from .NET 10 Integration Test - {Guid.NewGuid()}";
         var message = new ServiceBusMessage(messageBody);
             
         // Send message
-        await sender.SendMessageAsync(message);
+        await sender.SendMessageAsync(message, TestContext.Current.CancellationToken);
 
         // Await result
         var received1 = await receiveTask1;

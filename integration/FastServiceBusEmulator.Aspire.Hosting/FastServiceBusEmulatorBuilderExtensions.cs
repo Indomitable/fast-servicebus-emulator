@@ -33,7 +33,9 @@ public static class FastServiceBusEmulatorBuilderExtensions
             .WithEndpoint(
                 targetPort: FastServiceBusEmulatorResource.AdminPort,
                 name: FastServiceBusEmulatorResource.AdminEndpointName,
-                scheme: "http");
+                scheme: "http")
+            .WithHttpHealthCheck("/testing/messages")
+            .WithLifetime(ContainerLifetime.Session);
 
         return new FastServiceBusEmulatorResourceBuilder(resourceBuilder);
     }

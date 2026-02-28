@@ -11,13 +11,9 @@ public class TestingClient(HttpClient httpClient)
     /// <summary>
     /// Sends a message to a queue through the testing REST API.
     /// </summary>
-    public async Task PostQueueMessageAsync(
-        string queueName,
-        string body,
-        IDictionary<string, string>? headers = null,
-        CancellationToken cancellationToken = default)
+    public async Task PostQueueMessageAsync(string queueName, MessageRequest message, CancellationToken cancellationToken = default)
     {
-        using var request = BuildPostRequest($"/testing/messages/queues/{queueName}", body, headers);
+        using var request = BuildPostRequest($"/testing/messages/queues/{queueName}", message);
         var response = await httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
@@ -25,13 +21,9 @@ public class TestingClient(HttpClient httpClient)
     /// <summary>
     /// Sends a message to a topic through the testing REST API.
     /// </summary>
-    public async Task PostTopicMessageAsync(
-        string topicName,
-        string body,
-        IDictionary<string, string>? headers = null,
-        CancellationToken cancellationToken = default)
+    public async Task PostTopicMessageAsync(string topicName, MessageRequest message, CancellationToken cancellationToken = default)
     {
-        using var request = BuildPostRequest($"/testing/messages/topics/{topicName}", body, headers);
+        using var request = BuildPostRequest($"/testing/messages/topics/{topicName}", message);
         var response = await httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
@@ -104,23 +96,99 @@ public class TestingClient(HttpClient httpClient)
         return await httpClient.GetFromJsonAsync<List<MessageResponse>>($"/testing/messages/topics/{topicName}/subscriptions/{subscriptionName}", cancellationToken) ?? [];
     }
 
-    private static HttpRequestMessage BuildPostRequest(string path, string body, IDictionary<string, string>? headers)
+    private static HttpRequestMessage BuildPostRequest(string path, MessageRequest message)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, path)
-        {
-            Content = new StringContent(body)
-        };
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
 
-        if (headers is not null)
+        if (message.MessageId is not null)
         {
-            foreach (var header in headers)
-            {
-                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            }
+            request.Headers.Add("x-message-message-id", message.MessageId);
         }
+
+        if (message.Subject is not null)
+        {
+            request.Headers.Add("x-message-subject", message.Subject);
+        }
+
+        if (message.UserId is not null)
+        {
+            request.Headers.Add("x-message-user-id", message.UserId);
+        }
+
+        if (message.To is not null)
+        {
+            request.Headers.Add("x-message-to", message.To);
+        }
+
+        if (message.ReplyTo is not null)
+        {
+            request.Headers.Add("x-message-reply-to", message.ReplyTo);
+        }
+
+        if (message.CorrelationId is not null)
+        {
+            request.Headers.Add("x-message-correlation-id", message.CorrelationId);
+        }
+
+        if (message.ContentType is not null)
+        {
+            request.Headers.Add("x-message-content-type", message.ContentType);
+        }
+
+        if (message.GroupId is not null)
+        {
+            request.Headers.Add("x-message-group-id", message.GroupId);
+        }
+
+        if (message.ReplyToGroupId is not null)
+        {
+            request.Headers.Add("x-message-reply-to-group-id", message.ReplyToGroupId);
+        }
+
+        if (message.AbsoluteExpiration.HasValue)
+        {
+            request.Headers.Add("x-message-absolute-expiry-time", message.AbsoluteExpiration.Value.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+        }
+
+        foreach (var (key, value) in message.AppProperties)
+        {
+            request.Headers.Add("x-message-property", $"{key}={value}");
+        }
+
+        request.Content = message switch
+        {
+            BinaryMessageRequest { Content: not null } br => new ByteArrayContent(br.Content),
+            StringMessageRequest { Content: not null } str => new StringContent(str.Content),
+            _ => null
+        };
 
         return request;
     }
+}
+
+public abstract class MessageRequest
+{
+    public string? MessageId { get; set; }
+    public string? Subject { get; set; }
+    public string? UserId { get; set; }
+    public string? To { get; set; }
+    public string? ReplyTo { get; set; }
+    public string? CorrelationId { get; set; }
+    public string? ContentType { get; set; }
+    public string? GroupId { get; set; }
+    public string? ReplyToGroupId { get; set; }
+    public DateTimeOffset? AbsoluteExpiration { get; set; }
+    public Dictionary<string, string> AppProperties { get; set; } = new();
+}
+
+public class BinaryMessageRequest: MessageRequest
+{
+    public byte[]? Content { get; set; }
+}
+
+public class StringMessageRequest : MessageRequest
+{
+    public string? Content { get; set; }
 }
 
 public class MessageResponse

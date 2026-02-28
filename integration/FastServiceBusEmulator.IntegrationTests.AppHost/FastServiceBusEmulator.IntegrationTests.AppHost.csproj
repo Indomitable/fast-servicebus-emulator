@@ -1,0 +1,16 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <UserSecretsId>60993494-27fb-4c5a-a3a3-196894a4f833</UserSecretsId>
+        <RootNamespace>FastServiceBusEmulator.IntegrationTests.AppHost</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Reflection.AssemblyMetadata">
+            <_Parameter1>ProjectLocation</_Parameter1>
+            <_Parameter2>$(MSBuildProjectDirectory)</_Parameter2>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+</Project>

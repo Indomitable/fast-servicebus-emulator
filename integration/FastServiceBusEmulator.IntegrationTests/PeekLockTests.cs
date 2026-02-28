@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 /// <summary>
 /// Tests for PeekLock receive mode: complete, abandon, delivery count, and broker properties.
@@ -31,18 +31,18 @@ public class PeekLockTests : BaseServiceBusTest
 
         // Send a message
         var messageBody = $"peeklock-complete-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // Receive in PeekLock — message is locked, not removed
-        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(received);
         Assert.Equal(messageBody, received.Body.ToString());
 
         // Complete the message — removes it from the queue
-        await receiver.CompleteMessageAsync(received);
+        await receiver.CompleteMessageAsync(received, TestContext.Current.CancellationToken);
 
         // Subsequent receive should return null — message is gone
-        var next = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var next = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(next);
     }
 
@@ -68,21 +68,21 @@ public class PeekLockTests : BaseServiceBusTest
 
         // Send a message
         var messageBody = $"peeklock-abandon-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // Receive and abandon
-        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(received);
         Assert.Equal(messageBody, received.Body.ToString());
-        await receiver.AbandonMessageAsync(received);
+        await receiver.AbandonMessageAsync(received, cancellationToken: TestContext.Current.CancellationToken);
 
         // Message should reappear
-        var redelivered = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var redelivered = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(redelivered);
         Assert.Equal(messageBody, redelivered.Body.ToString());
 
         // Clean up — complete it so it doesn't linger
-        await receiver.CompleteMessageAsync(redelivered);
+        await receiver.CompleteMessageAsync(redelivered, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -107,24 +107,24 @@ public class PeekLockTests : BaseServiceBusTest
 
         // Send a message
         var messageBody = $"peeklock-deliverycount-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // First receive — DeliveryCount should be 1
-        var first = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var first = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(first);
         Assert.Equal(1, first.DeliveryCount);
 
         // Abandon
-        await receiver.AbandonMessageAsync(first);
+        await receiver.AbandonMessageAsync(first, cancellationToken: TestContext.Current.CancellationToken);
 
         // Second receive — DeliveryCount should be 2
-        var second = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var second = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(second);
         Assert.Equal(messageBody, second.Body.ToString());
         Assert.Equal(2, second.DeliveryCount);
 
         // Clean up
-        await receiver.CompleteMessageAsync(second);
+        await receiver.CompleteMessageAsync(second, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -149,10 +149,10 @@ public class PeekLockTests : BaseServiceBusTest
 
         // Send a message
         var messageBody = $"peeklock-brokerprops-{Guid.NewGuid()}";
-        await sender.SendMessageAsync(new ServiceBusMessage(messageBody));
+        await sender.SendMessageAsync(new ServiceBusMessage(messageBody), TestContext.Current.CancellationToken);
 
         // Receive
-        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var received = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(received);
 
         // SequenceNumber should be > 0
@@ -167,6 +167,6 @@ public class PeekLockTests : BaseServiceBusTest
         Assert.True(received.DeliveryCount >= 1, $"DeliveryCount should be >= 1, got {received.DeliveryCount}");
 
         // Clean up
-        await receiver.CompleteMessageAsync(received);
+        await receiver.CompleteMessageAsync(received, TestContext.Current.CancellationToken);
     }
 }

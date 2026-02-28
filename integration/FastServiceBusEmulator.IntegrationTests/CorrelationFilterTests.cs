@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 
-namespace AzureServiceBusEmulator.IntegrationTests;
+namespace FastServiceBusEmulator.IntegrationTests;
 
 /// <summary>
 /// Tests for subscription correlation filter routing:
@@ -46,29 +46,29 @@ public class CorrelationFilterTests : BaseServiceBusTest
         // Send a matching message (Subject = "order-created")
         var matchBody = $"order-match-{Guid.NewGuid()}";
         var matchMsg = new ServiceBusMessage(matchBody) { Subject = "order-created" };
-        await sender.SendMessageAsync(matchMsg);
+        await sender.SendMessageAsync(matchMsg, TestContext.Current.CancellationToken);
 
         // Send a non-matching message (Subject = "other-event")
         var otherBody = $"other-event-{Guid.NewGuid()}";
         var otherMsg = new ServiceBusMessage(otherBody) { Subject = "other-event" };
-        await sender.SendMessageAsync(otherMsg);
+        await sender.SendMessageAsync(otherMsg, TestContext.Current.CancellationToken);
 
         // all-sub should receive both messages
-        var allMsg1 = await allReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var allMsg1 = await allReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(allMsg1);
-        var allMsg2 = await allReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var allMsg2 = await allReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(allMsg2);
         var allBodies = new[] { allMsg1.Body.ToString(), allMsg2.Body.ToString() };
         Assert.Contains(matchBody, allBodies);
         Assert.Contains(otherBody, allBodies);
 
         // orders-sub should only receive the matching message
-        var ordersMsg = await ordersReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var ordersMsg = await ordersReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(ordersMsg);
         Assert.Equal(matchBody, ordersMsg.Body.ToString());
 
         // orders-sub should have no more messages
-        var ordersNext = await ordersReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var ordersNext = await ordersReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(ordersNext);
     }
 
@@ -102,30 +102,30 @@ public class CorrelationFilterTests : BaseServiceBusTest
         var matchBody = $"region-match-{Guid.NewGuid()}";
         var matchMsg = new ServiceBusMessage(matchBody);
         matchMsg.ApplicationProperties["region"] = "us-east";
-        await sender.SendMessageAsync(matchMsg);
+        await sender.SendMessageAsync(matchMsg, TestContext.Current.CancellationToken);
 
         // Send a non-matching message (region = "eu-west")
         var otherBody = $"region-other-{Guid.NewGuid()}";
         var otherMsg = new ServiceBusMessage(otherBody);
         otherMsg.ApplicationProperties["region"] = "eu-west";
-        await sender.SendMessageAsync(otherMsg);
+        await sender.SendMessageAsync(otherMsg, TestContext.Current.CancellationToken);
 
         // catch-all-sub should receive both messages
-        var all1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var all1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(all1);
-        var all2 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var all2 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(all2);
         var allBodies = new[] { all1.Body.ToString(), all2.Body.ToString() };
         Assert.Contains(matchBody, allBodies);
         Assert.Contains(otherBody, allBodies);
 
         // region-sub should only receive the matching message
-        var regionMsg = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var regionMsg = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(regionMsg);
         Assert.Equal(matchBody, regionMsg.Body.ToString());
 
         // region-sub should have no more messages
-        var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(regionNext);
     }
     
@@ -162,7 +162,7 @@ public class CorrelationFilterTests : BaseServiceBusTest
                 ["region"] = "eu-east"
             }
         };
-        await sender.SendMessageAsync(regMsg1);
+        await sender.SendMessageAsync(regMsg1, TestContext.Current.CancellationToken);
 
         var regBody2 = $"region-2-{Guid.NewGuid()}";
         var regMsg2 = new ServiceBusMessage(regBody2)
@@ -172,7 +172,7 @@ public class CorrelationFilterTests : BaseServiceBusTest
                 ["region"] = "canada-central"
             }
         };
-        await sender.SendMessageAsync(regMsg2);
+        await sender.SendMessageAsync(regMsg2, TestContext.Current.CancellationToken);
         
         
         var regBody3 = $"region-3-{Guid.NewGuid()}";
@@ -183,22 +183,22 @@ public class CorrelationFilterTests : BaseServiceBusTest
                 ["region"] = "japan-east"
             }
         };
-        await sender.SendMessageAsync(regMsg3);
+        await sender.SendMessageAsync(regMsg3, TestContext.Current.CancellationToken);
 
-        var regionMsg1 = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var regionMsg1 = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(regionMsg1);
-        var regionMsg2 = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var regionMsg2 = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.NotNull(regionMsg2);
         string[] bodies = [regionMsg1.Body.ToString(), regionMsg2.Body.ToString()];
         Assert.Contains(regBody1, bodies);
         Assert.Contains(regBody2, bodies);
         
-        var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3));
+        var regionNext = await regionReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         Assert.Null(regionNext);
         
-        var m1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-        var m2 = await  catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-        var m3 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
+        var m1 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var m2 = await  catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var m3 = await catchAllReceiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         
         Assert.NotNull(m1);
         Assert.NotNull(m2);

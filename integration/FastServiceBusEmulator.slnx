@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="FastServiceBusEmulator.Aspire.Hosting.AppHost\FastServiceBusEmulator.Aspire.Hosting.AppHost.csproj" />
+  <Project Path="FastServiceBusEmulator.Aspire.Hosting.Tests\FastServiceBusEmulator.Aspire.Hosting.Tests.csproj" />
+  <Project Path="FastServiceBusEmulator.Aspire.Hosting\FastServiceBusEmulator.Aspire.Hosting.csproj" />
+  <Project Path="FastServiceBusEmulator.IntegrationTests.AppHost\FastServiceBusEmulator.IntegrationTests.AppHost.csproj" />
+  <Project Path="FastServiceBusEmulator.IntegrationTests\FastServiceBusEmulator.IntegrationTests.csproj" />
+  <Project Path="FastServiceBusEmulatorTestProject/FastServiceBusEmulatorTestProject.csproj" />
+</Solution>
