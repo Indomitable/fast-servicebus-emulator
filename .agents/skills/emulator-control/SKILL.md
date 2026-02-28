@@ -128,59 +128,6 @@ Search for specific address/queue:
 grep "input-queue" /tmp/emulator.log
 ```
 
-## Configuration
-
-### Default topology (`config.yaml`)
-
-12 queues:
-- `input-queue`, `processing-queue`, `prefetch-queue` -- basic queues
-- `peeklock-complete-queue`, `peeklock-abandon-queue`, `peeklock-deliverycount-queue`, `peeklock-brokerprops-queue` -- PeekLock test queues
-- `dlq-explicit-queue`, `dlq-auto-queue` (max_delivery_count: 2) -- dead-letter test queues
-- `ttl-discard-queue`, `ttl-dlq-queue` (default_message_ttl_secs: 2) -- TTL test queues
-- `backpressure-queue` (max_size: 10) -- backpressure test queue
-
-4 topics:
-- `events-topic` -- subscriptions: `sub-1`, `sub-2`
-- `competing-topic` -- subscription: `shared-sub`
-- `filter-topic` -- subscriptions: `orders-sub` (subject filter), `all-sub`
-- `filter-appprop-topic` -- subscriptions: `region-sub` (property filter), `catch-all-sub`
-
-### Config options per queue/subscription
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `lock_duration_secs` | 30 | PeekLock lock duration |
-| `max_delivery_count` | 10 | Auto-dead-letter threshold |
-| `default_message_ttl_secs` | 0 (no TTL) | Message expiration |
-| `dead_lettering_on_message_expiration` | false | Move expired to DLQ |
-| `max_size` | none | Backpressure limit |
-
-### Subscription filters
-
-Only correlation filters are supported:
-```yaml
-subscriptions:
-  - name: orders-sub
-    filter:
-      type: Correlation
-      subject: "order-created"
-  - name: region-sub
-    filter:
-      type: Correlation
-      properties:
-        region: "us-east"
-```
-
-SQL filters are parsed but not evaluated (log warning, match all messages).
-
-## Port and process details
-
-- **Port**: 5672 (AMQP 1.0 over plain TCP, no TLS)
-- **Bind address**: 0.0.0.0 (all interfaces)
-- **Process name**: `fast-servicebus-emulator`
-- **Default log file**: `/tmp/emulator.log`
-- **Binary location**: `target/debug/fast-servicebus-emulator` (debug) or `target/release/fast-servicebus-emulator` (release)
-
 ## Environment variables
 
 | Variable | Default | Description |
@@ -207,18 +154,12 @@ SQL filters are parsed but not evaluated (log warning, match all messages).
 
 Build image (uses podman):
 ```bash
-podman build -t localhost/servicebus-emulator .
+podman build -t docker.io/indomitable/fast-servicebus-emulator .
 ```
 
 Run container:
 ```bash
-podman run -p 5672:5672 localhost/servicebus-emulator
+podman run -p 5672:5672 -p 45672:45672 docker.io/indomitable/fast-servicebus-emulator
 ```
 
 The Docker image is scratch-based (~4.58 MB) with a statically-linked musl binary. Config path inside container: `/config/config.yaml`.
-
-## Integration with testing
-
-- **Rust integration tests** bind to port 5672 themselves. Stop the emulator before running `cargo test`.
-- **.NET integration tests** connect to a running emulator on port 5672. Start the emulator before running `dotnet test`.
-- Use the `test-runner` skill to automatically manage the emulator lifecycle during the full test suite.

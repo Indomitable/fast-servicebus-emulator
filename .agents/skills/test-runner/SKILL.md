@@ -63,20 +63,17 @@ cargo test
 ```
 
 ### Phase 4: .NET integration tests (emulator MUST be running)
+Dotnet tests can be run directly using `dotnet test` . Most of the tests are located in `FastServiceBusEmulator.IntegrationTests` project.
+It is using an Aspire which starts automatically the emulator on port 5672, so no need to start it manually.
 ```bash
-# Start emulator in background
-RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator > /tmp/emulator.log 2>&1 &
-
-# Wait for startup
-sleep 2
-
-# Verify emulator is listening
-ss -tlnp | grep 5672
-
-# Build and run .NET tests
-cd integration/AzureServiceBusEmulator.IntegrationTests
-dotnet build
-dotnet test --no-build -v n
+# Run all tests in a class
+dotnet test --filter-class FULL_CLASS_NAME
+# example:
+dotnet test --filter-class FastServiceBusEmulator.IntegrationTests.CorrelationFilterTests
+# Run a single test
+dotnet test --filter-method FULL_METHOD_NAME
+# example:
+dotnet test --filter-method FastServiceBusEmulator.IntegrationTests.CorrelationFilterTests.Correlation_Filter_Routes_By_Subject
 ```
 
 To run a single .NET test:
@@ -88,66 +85,3 @@ dotnet test --no-build -v n --filter "TestMethodName"
 ```bash
 kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null
 ```
-
-## Test categories
-
-### Rust Unit Tests (~57 tests, inline `#[cfg(test)]` modules)
-| File | What it tests |
-|------|---------------|
-| `src/config.rs` | YAML parsing, defaults, filters, edge cases |
-| `src/store.rs` | Enqueue/receive, PeekLock lifecycle, settlement, auto-DLQ, lock expiry, TTL, backpressure |
-| `src/router.rs` | Queue/topic routing, fan-out, competing consumers, address resolution, broker properties, correlation filters |
-| `src/server.rs` | patch_attach_if_needed scenarios |
-| `src/sasl.rs` | Mechanism listing, accept any init/response |
-| `src/cbs.rs` | Response building, correlation, state init |
-
-### Rust Integration Tests (4 files in `tests/`)
-| File | What it tests |
-|------|---------------|
-| `queue_test.rs` | AMQP queue send/receive over TCP |
-| `topic_test.rs` | AMQP topic fanout over TCP |
-| `cbs_test.rs` | CBS put-token handshake over TCP |
-| `stress_test.rs` | Sequential and concurrent connections |
-
-### .NET Integration Tests (20 tests, 9 files)
-| File | What it tests |
-|------|---------------|
-| `EmulatorTests.cs` | Queue send/receive, topic fanout |
-| `SingleReceiverTests.cs` | Competing consumer correctness |
-| `LinkCreditTests.cs` | Flow credit / prefetch |
-| `PeekLockTests.cs` | Complete, abandon, delivery count, broker properties |
-| `DeadLetterTests.cs` | Explicit DLQ, auto DLQ on max delivery |
-| `MessageTtlTests.cs` | TTL discard, TTL with dead-lettering |
-| `BackpressureTests.cs` | Reject when queue full |
-| `CorrelationFilterTests.cs` | Subject filter, app property filter |
-
-Connection string: `Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true`
-
-## Common test failures and fixes
-
-### Port already in use
-- Symptom: `Address already in use (os error 98)`
-- Fix: Kill existing emulator: `kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null`
-
-### .NET tests timeout
-- Symptom: Tests hang or timeout after 30s
-- Debug: `tail -50 /tmp/emulator.log` for AMQP protocol errors
-- Common causes: Missing broker properties, disposition echo issues
-- Use the `amqp-debug` skill for detailed diagnosis
-
-### Delivery count assertion fails
-- Symptom: `DeliveryCount_Increments_On_Abandon` reports count=2 instead of 1
-- Fix: `stamp_broker_properties()` in `src/router.rs` must use `delivery_count.saturating_sub(1)`
-
-### "Nullable object must have a value"
-- Symptom: .NET SDK throws on first message receive
-- Fix: `header.delivery_count` must always be serialized (manual Serialize impl in `vendor/fe2o3-amqp/fe2o3-amqp-types/src/messaging/format/header.rs`)
-
-## Files involved
-
-- `Cargo.toml` - Rust project definition
-- `config.yaml` - Static topology (12 queues, 4 topics)
-- `src/**/*.rs` - Emulator source (8 files)
-- `tests/*.rs` - Rust integration tests (4 files)
-- `integration/AzureServiceBusEmulator.IntegrationTests/*.cs` - .NET tests (9 files)
-- `/tmp/emulator.log` - Emulator runtime logs

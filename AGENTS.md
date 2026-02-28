@@ -4,7 +4,7 @@ This file provides guidance for AI agents working on this codebase.
 
 ## Project Overview
 
-A high-performance, lightweight Azure Service Bus emulator written in Rust. It implements AMQP 1.0 over plain TCP (port 5672) and is designed to work with official Azure SDKs (especially .NET). The emulator uses static topology defined in YAML, supports in-memory message storage only, and provides mock authentication (SASL + CBS).
+A high-performance, lightweight Azure Service Bus emulator written in Rust. It implements AMQP 1.0 over plain TCP (port 5672) and is designed to work with official Azure SDKs (especially .NET). The emulator uses static topology defined in YAML, supports in-memory message storage only, and provides mock authentication (SASL + CBS). It also provides a testing REST API for messages management working on port 45672.
 
 ## Architecture
 
@@ -16,6 +16,18 @@ TCP (port 5672)
     -> Links (sender/receiver)
       -> CBS links ($cbs) for mock token auth
       -> Queue/Topic links for message flow
+HTTP (port 45672)
+  -> REST API for messages management
+  - POST /testing/messages/queue/{queue_name} - Create a message and send it to the specified queue.
+  - POST /testing/messages/topic/{topic_name} - Create a message and send it to the specified topic.
+  - DELETE /testing/messages - Delete all messages from all queues and topics.
+  - DELETE /testing/messages/queue/{queue_name} - Delete all messages from the specified queue.
+  - DELETE /testing/messages/topic/{topic_name} - Delete all messages from the specified topic.
+  - DELETE /testing/messages/topic/{topic_name}/subscription/{subscription_name} - Delete all messages from the specified subscription.
+  - GET /testing/messages - Retrieve all messages from all queues and topics.
+  - GET /testing/messages/queue/{queue_name} - Retrieve all messages from the specified queue.
+  - GET /testing/messages/topic/{topic_name} - Retrieve all messages from the specified topic.
+  - GET /testing/messages/topic/{topic_name}/subscription/{subscription_name} - Retrieve all messages from the specified subscription.
 ```
 
 ### Key Design Decisions
@@ -30,65 +42,16 @@ TCP (port 5672)
 ## Directory Structure
 
 ```
-src/                    # Emulator Rust source code (10 files)
-tests/                  # Rust integration tests (6 files)
-integration/            # .NET xUnit integration tests (9 test files)
+src/                    # Emulator Rust source code
+tests/                  # Rust integration tests
+integration/            # .NET integration tests and Aspire nuget library.
 vendor/fe2o3-amqp/      # Git submodule: patched fe2o3-amqp AMQP 1.0 library
-vendor/azure-sdk-for-net/  # Reference: Azure .NET SDK source (read-only)
-vendor/azure-amqp/      # Reference: Microsoft.Azure.Amqp source (read-only)
+vendor/azure-sdk-for-net/  # Reference: Azure .NET SDK source
+vendor/azure-amqp/      # Reference: Microsoft.Azure.Amqp source
 config.yaml             # Static topology configuration
 Dockerfile              # Scratch-based Docker image (musl static binary)
 PLAN.md                 # Full project plan and requirements
 ```
-
-## Source Files
-
-### `src/main.rs` (~30 lines)
-Entry point. Sets up tracing, reads `CONFIG_PATH` env var, loads config, starts server.
-
-### `src/lib.rs` (~7 lines)
-Module declarations.
-
-### `src/config.rs` (~390 lines)
-YAML topology configuration parsing. Key types:
-- `Config` / `Topology` / `QueueConfig` / `TopicConfig` / `SubscriptionConfig`
-- `SubscriptionFilter` enum (`Correlation` variant only; `Sql` is parsed but not evaluated)
-- `SubscriptionEntry` (untagged: string name or full config object)
-
-### `src/server.rs` (~360 lines)
-AMQP connection handling and link lifecycle. Key functions:
-- `Server::run()` / `Server::run_on()` -- TCP listener on 0.0.0.0:5672
-- `handle_connection()` -- SASL handshake, AMQP connection setup
-- `handle_session()` -- link accept loop, CBS state per session
-- `handle_link()` -- routes sender/receiver endpoints to CBS or queue/topic handlers
-- `patch_attach_if_needed()` -- workaround for Azure SDK bug (missing `initial_delivery_count` on sender Attach frames)
-
-### `src/router.rs` (~650 lines)
-Message routing and delivery. Handles link lifecycle for messaging.
-- `Router` -- owns all message stores, DLQ stores, topic-subscription mappings
-- `Router::publish()` -- enqueues to queue or fans out to topic subscriptions
-- `handle_incoming_messages()` -- client-to-server (sender link handler)
-- `handle_outgoing_messages()` -- server-to-client, ReceiveAndDelete mode
-- `handle_outgoing_messages_peek_lock()` -- server-to-client, PeekLock mode with disposition settlement
-- `handle_outgoing_dlq_messages()` / `handle_outgoing_dlq_messages_peek_lock()` -- DLQ variants
-
-### `src/store.rs` (~760 lines)
-In-memory message store. Key types:
-- `MessageStore` -- main queue/subscription store with enqueue, receive, lock, complete, abandon, dead-letter, TTL expiry, backpressure (`logical_count` / `max_size`)
-- `DlqStore` -- dead-letter queue (simpler, no TTL, no nested DLQ)
-- `Envelope` -- wraps a message with metadata (sequence number, delivery count, lock state, TTL)
-- `EntityConfig` -- per-queue/subscription settings (lock duration, max delivery count, TTL, max size)
-
-### `src/helpers/router_message.rs` (~580 lines)
-Internal message utilities and their unit tests.
-- `stamp_broker_properties()` -- stamps sequence number, enqueued time, lock token, delivery count on outgoing messages
-- `matches_filter()` -- evaluates correlation filters against message properties
-
-### `src/sasl.rs` (~115 lines)
-Mock SASL acceptor. Accepts ANONYMOUS, PLAIN, MSSBCBS, EXTERNAL. Always returns `SaslCode::Ok`.
-
-### `src/cbs.rs` (~160 lines)
-Mock CBS (Claims-Based Security) handler. Accepts any put-token request, responds with status 200 OK.
 
 ## fe2o3-amqp Submodule (vendor/fe2o3-amqp/)
 
@@ -117,39 +80,26 @@ Key config options per queue/subscription:
 
 ### Rust Tests
 ```bash
-cargo test --lib           # ~57 unit tests (inline #[cfg(test)] modules)
+cargo test --lib           
 cargo test                 # All tests including integration (requires emulator NOT running on 5672)
 cargo test --test queue_test   # Individual integration test
 ```
 
-### .NET Integration Tests (20 tests, 9 files)
-Require the emulator running on port 5672.
+### .NET Integration Tests
+Dotnet tests can be run directly using `dotnet test` . Most of the tests are located in `FastServiceBusEmulator.IntegrationTests` project.
+It is using an Aspire which starts automatically the emulator on port 5672, so no need to start it manually.
 ```bash
-# Start emulator
-RUST_LOG=debug CONFIG_PATH=config.yaml cargo run > /tmp/emulator.log 2>&1 &
-
-# Build and run tests
-cd integration/AzureServiceBusEmulator.IntegrationTests
-dotnet build
-dotnet test --no-build -v n
-
-# Single test
-dotnet test --no-build -v n --filter "Send_To_Full_Queue_Is_Rejected"
+# Run all tests in a class
+dotnet test --filter-class FULL_CLASS_NAME
+# example:
+dotnet test --filter-class FastServiceBusEmulator.IntegrationTests.CorrelationFilterTests
+# Run a single test
+dotnet test --filter-method FULL_METHOD_NAME
+# example:
+dotnet test --filter-method FastServiceBusEmulator.IntegrationTests.CorrelationFilterTests.Correlation_Filter_Routes_By_Subject
 ```
 
 Connection string: `Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true`
-
-### Test Categories
-| File | Tests | What it covers |
-|------|-------|----------------|
-| `EmulatorTests.cs` | Queue send/receive, topic fanout | Basic AMQP messaging |
-| `SingleReceiverTests.cs` | Single receiver semantics | Competing consumer correctness |
-| `LinkCreditTests.cs` | Flow credit / prefetch | AMQP flow control |
-| `PeekLockTests.cs` | Complete, abandon, delivery count, broker properties | Lock-based settlement |
-| `DeadLetterTests.cs` | Explicit DLQ, auto DLQ on max delivery | Dead-letter queues |
-| `MessageTtlTests.cs` | TTL discard, TTL with dead-lettering | Message expiration |
-| `BackpressureTests.cs` | Reject when queue full | Backpressure / max_size |
-| `CorrelationFilterTests.cs` | Subject filter, app property filter | Subscription filters |
 
 ## Build and Deploy
 
@@ -159,8 +109,8 @@ cargo build
 RUST_LOG=debug CONFIG_PATH=config.yaml ./target/debug/fast-servicebus-emulator
 
 # Docker (uses podman)
-podman build -t localhost/servicebus-emulator .
-podman run -p 5672:5672 localhost/servicebus-emulator
+podman build -t docker.io/indomitable/fast-servicebus-emulator .
+podman run -p 5672:5672 -p 45672:45672 docker.io/indomitable/fast-servicebus-emulator
 
 # Kill running emulator
 kill $(pgrep -f fast-servicebus-emulator) 2>/dev/null
