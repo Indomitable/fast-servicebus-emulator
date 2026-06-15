@@ -12,5 +12,8 @@
             <_Parameter2>$(MSBuildProjectDirectory)</_Parameter2>
         </AssemblyAttribute>
     </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="StreamJsonRpc" />
+    </ItemGroup>
 
 </Project>
